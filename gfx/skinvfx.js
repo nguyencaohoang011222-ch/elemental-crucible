@@ -1,3 +1,4 @@
+import { HAND_Y } from './skinlines.js';
 // skinVFXHooks: lớp hiệu ứng theo skin, đè lên đường vẽ mặc định của renderer mà KHÔNG đụng logic chiến đấu
 // (sát thương, tầm đánh, hình dạng vùng trúng giữ nguyên — chỉ thay hình ảnh). Hạng skin quyết định hook nào chạy:
 //   single → chiêu đơn nguyên tố (hình học riêng theo Lửa/Nước/Đất/Gió, tô theo chủ đề skin)
@@ -534,7 +535,7 @@ export function ghostHook(R, ctx, p, fr, th, X, Y, W, Hh, dashing, dt) {
 export function chargeHook(R, ctx, p, th, t, sim) {
   const c = p.charge; if (!(c > 0.05)) return; const P = th.pal, ax = Math.cos(p.aim), ay = Math.sin(p.aim);
   if (p.cls === 'RANGER' && th.id === 'starlight') { // tia ngắm thiên hà sắc lẹm + khoá mục tiêu chòm sao + đồng hồ tụ lực ôm quanh người
-    const bx = p.x + ax * 24, by = p.y - 10 + ay * 24, L = 300 + 400 * c, ex = bx + ax * L, ey = by + ay * L, ready = c >= 0.75;
+    const bx = p.x + ax * 24, by = p.y + HAND_Y + ay * 24, L = 300 + 400 * c, ex = bx + ax * L, ey = by + ay * L, ready = c >= 0.75;
     line(ctx, bx, by, ex, ey, WPP * 3, '#1e1650', WPP); line(ctx, bx, by, ex, ey, WPP * 2, ready ? '#7fe0ff' : '#3a6aa8', WPP); line(ctx, bx, by, ex, ey, WPP, '#ffffff', WPP);
     for (let i = 0; i < 5; i++) { const u = (t * 1.6 + i / 5) % 1; sq(ctx, bx + ax * L * u, by + ay * L * u, WPP * 3, PRISM[i % 4]); }
     bracket(ctx, ex, ey, 16, t * 2.5, ready ? '#ffffff' : '#7fe0ff'); sq(ctx, ex, ey, WPP, '#ffffff');
@@ -547,7 +548,7 @@ export function chargeHook(R, ctx, p, th, t, sim) {
     return;
   }
   if (p.cls === 'MAGE' && th.id === 'celestial') { // vòng ấn vàng xoay trước đầu trượng, to dần khi tụ lực
-    const f = p.face || 1, tx = p.x + Math.cos(p.aim - 0.5 * f) * 62, ty = p.y - 10 + Math.sin(p.aim - 0.5 * f) * 62, r = 14 + 16 * c;
+    const f = p.face || 1, tx = p.x + Math.cos(p.aim - 0.5 * f) * 62, ty = p.y + HAND_Y + Math.sin(p.aim - 0.5 * f) * 62, r = 14 + 16 * c;
     ring(ctx, tx, ty, r, WPP, '#ffb81a', 0, t * 3); ring(ctx, tx, ty, r * 1.3, WPP, VIOLET, 10, -t * 4); star(ctx, tx, ty, r * 0.8, '#ffffff', 6, t * 2);
     for (let i = 0; i < 8; i++) { const a = t * 3 + i * 0.785; sq(ctx, tx + Math.cos(a) * r * 1.15, ty + Math.sin(a) * r * 1.0, WPP * 2, i & 1 ? '#ffffff' : '#ffb81a'); }
     ring(ctx, p.x, p.y + 8, 26 + 14 * c, WPP, '#ffb81a', 8, t * 2);
@@ -556,17 +557,17 @@ export function chargeHook(R, ctx, p, th, t, sim) {
   }
   const LN = LINES[th.id]; if (LN && LN.charge) { LN.charge(R, ctx, p, t); return; }
   if (p.cls === 'KNIGHT') { // năng lượng hội tụ vào lưỡi kiếm, vòng răng cưa khi tụ đủ
-    const hx = p.x + ax * 40, hy = p.y - 10 + ay * 40;
+    const hx = p.x + ax * 40, hy = p.y + HAND_Y + ay * 40;
     for (let i = 0; i < 10; i++) { const a = i * 0.628 + t * 2, d = 50 * (1 - ((t * 1.6 + i * 0.1) % 1)); sq(ctx, hx + Math.cos(a) * d, hy + Math.sin(a) * d * 0.8, WPP * 2, i & 1 ? P[2] : P[3]); }
     if (c >= 0.7) { ring(ctx, p.x, p.y + 8, 30 + Math.sin(t * 12) * 3, WPP, P[2], 6, t * 4); ring(ctx, p.x, p.y + 8, 40, WPP, P[1], 8, -t * 3); }
   } else if (p.cls === 'RANGER') { // đường hội tụ quanh cung + tâm ngắm (màn hình làm mờ mép riêng ở screenHook)
-    const bx = p.x + ax * 24, by = p.y - 10 + ay * 24; ctx.globalAlpha = 0.4 + 0.6 * c;
+    const bx = p.x + ax * 24, by = p.y + HAND_Y + ay * 24; ctx.globalAlpha = 0.4 + 0.6 * c;
     for (let i = 0; i < 10; i++) { const a = i * 0.628 + 0.3, ph = (t * 2.2 + i * 0.13) % 1, r1 = 90 - ph * 70; line(ctx, bx + Math.cos(a) * r1, by + Math.sin(a) * r1, bx + Math.cos(a) * (r1 + 14), by + Math.sin(a) * (r1 + 14), WPP, i & 1 ? P[2] : P[3], WPP); }
     sq(ctx, bx, by, WPP * (2 + Math.round(c * 2)), P[3]); ctx.globalAlpha = 1;
     const L = 300 + 400 * c; ring(ctx, p.x + ax * L, p.y - 8 + ay * L, 14, WPP, P[2], 4, t * 3);
   } else { // pháp sư: hai vòng phép nghiêng xoay ngược chiều + hạt hội tụ ở đầu trượng
     for (const [rr, sy, sp, n] of [[30 + 12 * c, 0.4, 1.8, 14], [22 + 10 * c, 0.75, -2.6, 10]]) for (let i = 0; i < n; i++) { const a = t * sp + i / n * 6.283; sq(ctx, p.x + Math.cos(a) * rr, p.y - 6 + Math.sin(a) * rr * sy, WPP * (i % 3 ? 1 : 2), i % 3 ? P[2] : P[3]); }
-    const f = p.face || 1, tx = p.x + Math.cos(p.aim - 0.5 * f) * 56, ty = p.y - 10 + Math.sin(p.aim - 0.5 * f) * 56;
+    const f = p.face || 1, tx = p.x + Math.cos(p.aim - 0.5 * f) * 56, ty = p.y + HAND_Y + Math.sin(p.aim - 0.5 * f) * 56;
     for (let i = 0; i < 6; i++) { const a = i * 1.047 + t * 3, d = 30 * (1 - ((t * 1.4 + i * 0.16) % 1)); sq(ctx, tx + Math.cos(a) * d, ty + Math.sin(a) * d, WPP, P[3]); }
     if (c >= 0.98) star(ctx, tx, ty, 18, P[3], 5, t * 3);
   }

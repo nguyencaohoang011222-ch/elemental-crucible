@@ -116,7 +116,7 @@ export class Sim {
     this.world.onBreak = o => this.emit('obstacleBreak', { x: o.x, y: o.y, r: o.r, type: o.type, v: o.v, charred: !!o.charred, crumble: !!o.crumble });
     this.t = 0; this.over = false; this.hitstop = 0; this.events = [];
     const c = CLASSES[cls];
-    this.p = { cls, x: 0, y: 0, vx: 0, vy: 0, r: 13, hp: c.hp, max: c.hp, aim: 0, face: 1,
+    this.p = { cls, x: 0, y: 0, vx: 0, vy: 0, r: 12, hp: c.hp, max: c.hp, aim: 0, face: 1,
       atkT: 0, combo: 0, comboT: 0, swing: 0, swingDir: 1, charge: 0, dashT: 0, dashCd: 0, dashX: 0, dashY: 0, inv: 0, hurtT: 0, focus: 1, focusOn: false, focusRegenT: 0 };
     this.enemies = []; this.shots = []; this.foes = []; this.gold = 0; this.kills = 0; this.nextId = 1;
     this.spawnT = 2; this.wave = 0; this.intensity = 0;

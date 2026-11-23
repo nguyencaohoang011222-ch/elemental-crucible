@@ -1,3 +1,5 @@
+// độ cao tay cầm vũ khí của nhân vật chibi so với tâm chân (world px)
+export const HAND_Y = -2;
 // Module hiệu ứng RIÊNG cho từng dòng skin hạng cao (Epic, Victory, HEROES, Boss).
 // Quy tắc: không dòng nào dùng lại mẫu hình của dòng khác rồi đổi màu. Mỗi dòng có hình học, vật lý hạt và câu chuyện riêng
 // cho: đi (walk), lướt (dash), đòn thường (basic), tụ lực (charge), đạn (shot), điểm trúng chiêu (impact), tuyệt kỹ (ult).
@@ -11,7 +13,7 @@ const decal = (R, f, o = {}) => { const D = R.skdec || (R.skdec = []); D.push({ 
 const every = (R, key, dt, gap) => { R[key] = (R[key] || 0) - dt; if (R[key] > 0) return false; R[key] = gap; return true; };
 const posOf = e => e.ev === 'arcSlash' ? [e.x + Math.cos(e.a) * (e.range || 100) * 0.8, e.y + Math.sin(e.a) * (e.range || 100) * 0.8] : (e.ev === 'beam' || e.ev === 'blink') ? [e.x2, e.y2] : [e.x, e.y];
 const tipOf = e => { const f = Math.cos(e.a) < 0 ? -1 : 1, q = e.a - 0.5 * f; return [e.x + Math.cos(q) * 60, e.y - 10 + Math.sin(q) * 60]; };
-const ptip = p => { const f = p.face || 1, q = p.aim - 0.5 * f; return [p.x + Math.cos(q) * 58, p.y - 10 + Math.sin(q) * 58]; };
+const ptip = p => { const f = p.face || 1, q = p.aim - 0.5 * f; return [p.x + Math.cos(q) * 58, p.y + HAND_Y + Math.sin(q) * 58]; };
 const part = (R, x, y, vx, vy, life, c, s, g) => { if (R.parts.length < 900) R.parts.push({ x, y, vx, vy, life, max: life, c, s, g }); };
 // đòn boss thật, thu nhỏ: h giống hệt một "hazard" của boss trong trận
 const bossHit = (R, type, h, T = 0.32) => spawn(R, (c, o, k, t) => { o.h.fade = 0.3 * (1 - k); BVX.impact(R, c, o.h, t); }, { T, h: { owner: { type }, ...h, fade: 0.3 } });
@@ -52,7 +54,7 @@ const shadow = {
     line(ctx, s.x - ca * 22, s.y - sa * 22, s.x, s.y, WPP * (big ? 2 : 1), SH.d, WPP); line(ctx, s.x - ca * 18, s.y - sa * 18, s.x, s.y, WPP, SH.v, WPP * 3); sq(ctx, s.x + ca * 2, s.y + sa * 2, WPP * 2, SH.w); return true; },
   dash(R, x, y, dx, dy) { for (let i = 0; i < 10; i++) part(R, x + (Math.random() - 0.5) * 20, y - 10, (Math.random() - 0.5) * 60, -30 - Math.random() * 40, 0.8, i & 1 ? SH.s : SH.d, 9); spawn(R, (c, o, k) => { c.globalAlpha = 1 - k; disc(c, o.x, o.y + 8, 16 * (1 - k) + 4, SH.d, 0.4); }, { x, y, T: 0.5 }); },
   walk(R, ctx, p, t, dt, moving) { if (moving && every(R, '_lw', dt, 0.2)) decal(R, (c, o, k) => { c.globalAlpha = (1 - k) * 0.7; disc(c, o.x, o.y, 5, SH.d, 0.5); if (k > 0.4) sq(c, o.x, o.y - (k - 0.4) * 30, WPP * 2, SH.s); }, { x: p.x + (Math.random() - 0.5) * 8, y: p.y + 10, T: 1.2 }); },
-  charge(R, ctx, p, t) { const [bx, by] = [p.x + Math.cos(p.aim) * 22, p.y - 10 + Math.sin(p.aim) * 22]; for (let j = 0; j < 5; j++) { const a0 = j * 1.256 + 0.6, sx = p.x + Math.cos(a0) * 46, sy = p.y + 8 + Math.sin(a0) * 16; for (let s = 0; s <= 8; s++) { const u = s / 8 * p.charge, w = Math.sin(u * 9 + t * 8 + j) * 5; sq(ctx, sx + (bx - sx) * u + w, sy + (by - sy) * u, WPP * (s < 4 ? 2 : 1), s > 6 ? SH.v : SH.s); } } },
+  charge(R, ctx, p, t) { const [bx, by] = [p.x + Math.cos(p.aim) * 22, p.y + HAND_Y + Math.sin(p.aim) * 22]; for (let j = 0; j < 5; j++) { const a0 = j * 1.256 + 0.6, sx = p.x + Math.cos(a0) * 46, sy = p.y + 8 + Math.sin(a0) * 16; for (let s = 0; s <= 8; s++) { const u = s / 8 * p.charge, w = Math.sin(u * 9 + t * 8 + j) * 5; sq(ctx, sx + (bx - sx) * u + w, sy + (by - sy) * u, WPP * (s < 4 ? 2 : 1), s > 6 ? SH.v : SH.s); } } },
   impact(R, x, y, r) { spawn(R, (c, o, k) => { // xúc tu có gai siết vào tâm
     c.globalAlpha = 1 - k * k; const close = Math.min(1, k * 2.5);
     for (let j = 0; j < 6; j++) { const a = j * 1.047 + o.seed; for (let s = 0; s <= 8; s++) { const u = s / 8, d = o.r * (1 - u * close), w = Math.sin(u * 7 + j) * 6, x2 = o.x + Math.cos(a) * d - Math.sin(a) * w, y2 = o.y + (Math.sin(a) * d + Math.cos(a) * w) * 0.7; sq(c, x2, y2, WPP * 2, SH.s); if (s % 3 === 1) sq(c, x2 + Math.cos(a + 1.6) * 4, y2 + Math.sin(a + 1.6) * 3, WPP, SH.v); } } }, { x, y, r, T: 0.6 }); }
@@ -134,7 +136,7 @@ const dragonKnight = {
     clawMark(R, x, y, Math.atan2(dy, dx));
   },
   walk(R, ctx, p, t, dt, moving) { if (!moving) return; if (every(R, '_lw', dt, 0.34)) clawMark(R, p.x, p.y + 10, Math.atan2(p.vy, p.vx), 0.55); if (every(R, '_lw2', dt, 0.09)) part(R, p.x + (Math.random() - 0.5) * 14, p.y + 6, (Math.random() - 0.5) * 16, -26, 0.9, Math.random() < 0.7 ? '#1a1414' : DK.g, Math.random() < 0.7 ? 6 : 3); },
-  charge(R, ctx, p, t) { const a = p.aim, n = Math.round(4 + p.charge * 6); for (let i = 0; i < n; i++) { const d = 16 + i * 6, x = p.x + Math.cos(a) * d, y = p.y - 10 + Math.sin(a) * d, h = 6 + H(i, (t * 14) | 0) * 10 * p.charge; line(ctx, x, y, x - 2, y - h, WPP * 2, DK.o, WPP); sq(ctx, x - 2, y - h, WPP, DK.g); } },
+  charge(R, ctx, p, t) { const a = p.aim, n = Math.round(4 + p.charge * 6); for (let i = 0; i < n; i++) { const d = 16 + i * 6, x = p.x + Math.cos(a) * d, y = p.y + HAND_Y + Math.sin(a) * d, h = 6 + H(i, (t * 14) | 0) * 10 * p.charge; line(ctx, x, y, x - 2, y - h, WPP * 2, DK.o, WPP); sq(ctx, x - 2, y - h, WPP, DK.g); } },
   impact(R, x, y, r, cat, e) { geyser(R, x, y, cat === 'duo' ? 120 : 80); spawn(R, (c, o, k) => { c.globalAlpha = 1 - k; fang(c, o.x - 30, o.y, 0, 40, 1.6, 1, k); fang(c, o.x + 30, o.y, Math.PI, 40, 1.6, -1, k); }, { x, y, T: 0.35 }); if (cat === 'duo') { geyser(R, x - r * 0.5, y + 10, 70); geyser(R, x + r * 0.5, y - 6, 70); } }
 };
 function clawMark(R, x, y, a, sc = 1) { decal(R, (c, o, k) => { const col = k < 0.2 ? DK.g : k < 0.5 ? DK.o : '#2a1410'; c.globalAlpha = Math.min(1, (1 - k) * 1.6); for (let j = -1; j <= 1; j++) { const nx = -Math.sin(o.a) * j * 6 * o.sc, ny = Math.cos(o.a) * j * 4 * o.sc; line(c, o.x + nx - Math.cos(o.a) * 12 * o.sc, o.y + ny - Math.sin(o.a) * 6 * o.sc, o.x + nx + Math.cos(o.a) * 12 * o.sc, o.y + ny + Math.sin(o.a) * 6 * o.sc, WPP, j ? '#1a0e0a' : col, WPP); } }, { x, y, a, sc, T: 2 }); }
@@ -409,9 +411,9 @@ dragonKnight.basic = (R, e) => {
   }
 };
 dragonKnight.charge = (R, ctx, p, t) => { // vảy rồng / tàn lửa xoắn ốc hội tụ vào kiếm, lưỡi kiếm nóng trắng
-  const c = p.charge, a = p.aim, tipX = p.x + Math.cos(a) * 54, tipY = p.y - 10 + Math.sin(a) * 54;
+  const c = p.charge, a = p.aim, tipX = p.x + Math.cos(a) * 54, tipY = p.y + HAND_Y + Math.sin(a) * 54;
   for (let i = 0; i < 14; i++) { const u = (t * 1.4 + i / 14) % 1, ang = i * 0.449 + u * 5, d = 70 * (1 - u); const x = p.x + Math.cos(ang) * d, y = p.y - 8 + Math.sin(ang) * d * 0.55; tri(ctx, [x, y - 4], [x - 3, y + 2], [x + 3, y + 2], i & 1 ? DK.g : DK.c); }
-  line(ctx, p.x + Math.cos(a) * 18, p.y - 10 + Math.sin(a) * 18, tipX, tipY, WPP * 2, c > 0.7 ? DK.w : DK.g, WPP);
+  line(ctx, p.x + Math.cos(a) * 18, p.y + HAND_Y + Math.sin(a) * 18, tipX, tipY, WPP * 2, c > 0.7 ? DK.w : DK.g, WPP);
   if (c > 0.7) { for (let q = 0; q < 4; q++) { const aa = q * 1.571 + t * 6; line(ctx, tipX, tipY, tipX + Math.cos(aa) * 10, tipY + Math.sin(aa) * 10, WPP, DK.w, WPP); } for (let i = 0; i < 18; i++) { const aa = t * 3 + i * 0.349; sq(ctx, p.x + Math.cos(aa) * 40, p.y + 4 + Math.sin(aa) * 18, WPP, i & 1 ? DK.g : DK.c); } }   // vòng vảy rồng khi tụ đủ
 };
 
@@ -479,7 +481,7 @@ dragonKnight.shot = (R, ctx, s, cat, t) => { if (cat !== 'single' || s.kind !== 
 // mỗi khung: hào quang khi lao (Gale Charge) / bóng ảnh + sao khi lộn (Gale Tumble)
 export function lineFrame(theme, R, ctx, sim, t, dt) {
   const p = sim.p, sd = p.sdash, fresh = sd && sd !== R._sdSeen; if (sd) R._sdSeen = sd;
-  if (theme === 'dragonfire' && sd && sd.kind === 'charge' && p.sdashT > 0) { const a = Math.atan2(sd.dy, sd.dx); for (const s2 of [-1, 1]) for (let i = 0; i < 10; i++) { const q = a + s2 * (0.6 + i * 0.13), r = 30 + i * 2; sq(ctx, p.x + Math.cos(q) * r, p.y - 10 + Math.sin(q) * r * 0.7, WPP * (i < 4 ? 2 : 1), i < 3 ? DK.w : i & 1 ? DK.g : DK.c); } tri(ctx, [p.x + Math.cos(a) * 40, p.y - 10 + Math.sin(a) * 28], [p.x + Math.cos(a + 2.4) * 22, p.y - 10 + Math.sin(a + 2.4) * 16], [p.x + Math.cos(a - 2.4) * 22, p.y - 10 + Math.sin(a - 2.4) * 16], DK.o); part(R, p.x - sd.dx * 20, p.y - 10, -sd.dx * 60, -20, 0.7, Math.random() < 0.5 ? DK.g : DK.o, 4); }
+  if (theme === 'dragonfire' && sd && sd.kind === 'charge' && p.sdashT > 0) { const a = Math.atan2(sd.dy, sd.dx); for (const s2 of [-1, 1]) for (let i = 0; i < 10; i++) { const q = a + s2 * (0.6 + i * 0.13), r = 30 + i * 2; sq(ctx, p.x + Math.cos(q) * r, p.y + HAND_Y + Math.sin(q) * r * 0.7, WPP * (i < 4 ? 2 : 1), i < 3 ? DK.w : i & 1 ? DK.g : DK.c); } tri(ctx, [p.x + Math.cos(a) * 40, p.y + HAND_Y + Math.sin(a) * 28], [p.x + Math.cos(a + 2.4) * 22, p.y + HAND_Y + Math.sin(a + 2.4) * 16], [p.x + Math.cos(a - 2.4) * 22, p.y + HAND_Y + Math.sin(a - 2.4) * 16], DK.o); part(R, p.x - sd.dx * 20, p.y + HAND_Y, -sd.dx * 60, -20, 0.7, Math.random() < 0.5 ? DK.g : DK.o, 4); }
   if (theme === 'starlight' && fresh && sd.kind === 'roll') { const x = p.x, y = p.y, a = Math.atan2(sd.dy, sd.dx); spawn(R, (c, o, k) => { c.globalAlpha = 1 - k; for (let i = 0; i <= 14; i++) { const q = o.a + Math.PI + (i / 14 - 0.5) * 2.2, r = 34 + k * 20; sq(c, o.x + Math.cos(q) * r, o.y - 6 + Math.sin(q) * r * 0.6, WPP * (i % 7 === 0 ? 2 : 1), i & 1 ? '#7fe0ff' : '#ffffff'); } for (let i = 0; i < 4; i++) { const q = i * 1.571 + 0.4, d = 12 + k * 40; star4(c, o.x + Math.cos(q) * d, o.y - 10 + Math.sin(q) * d * 0.7, 3, '#c08aff'); } }, { x, y, a, T: 0.4 }); }
 }
 export const ghostWhen = (theme, p) => theme === 'starlight' && p.sdash && p.sdash.kind === 'roll' && p.sdashT > 0;

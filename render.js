@@ -25,6 +25,7 @@ const HERO_OWN = new Set(['arcSlash', 'whirl', 'spike', 'rainHit', 'beam', 'blin
 import { drawUlts, ultEvent, drawUltEvents, ultCastFx } from './gfx/ultvfx.js';
 import { drawRelics } from './gfx/relicvfx.js';
 import { drawSigils, drawFoeTells, drawFoeShot, drawLobs, holeEye, reticle, drawIceSpikes } from './gfx/foevfx.js';
+import { HAND_Y } from './gfx/skinlines.js';
 import { Rig, heroPose, enemyPose, bossPose, weapon, ENEMY_SIZE, ENEMY_FEET, BOSS_DRAW, HERO_MX, HERO_MY, skinWeapon, lookAnim, staffTip } from './gfx/rig.js';
 import { EL_INFO, GROUP_COLOR } from './kits.js';
 import { BOSS_DEFS } from './boss.js';
@@ -651,13 +652,13 @@ export class Renderer {
     if (p.goldT > 0) { if (!fr.gold) fr.gold = tintOf(tintOf(fr.img, '#ffd34a'), '#c88a1a'); ctx.drawImage(fr.gold, X, Y, W, H); if (Math.floor(t * 8) % 3 === 0) { ctx.globalAlpha = 0.5; ctx.drawImage(fr.white, X, Y, W, H); } }
     else if (!blink) ctx.drawImage(this.hurtFlash > 0 ? (Math.floor(this.hurtFlash * 30) % 2 ? fr.white : fr.red) : fr.img, X, Y, W, H);
     ctx.restore();
-    if (p.goldT > 0) this.hourglass(ctx, p.x, p.y - 78 - z, 1 - p.goldT / (p.goldT0 || 1));
-    if (p.shield > 0 && !(p.goldT > 0)) { ctx.strokeStyle = rgba('#e6d29a', 0.35 + 0.15 * Math.sin(t * 7)); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y - 18 - z, 30, 38, 0, 0, 7); ctx.stroke(); }
-    if (p.rooted > 0) { ctx.strokeStyle = '#5a8a2a'; ctx.lineWidth = 4; for (let i = 0; i < 6; i++) { const a = i * 1.05 + 0.3; ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * 22, p.y + 10 + Math.sin(a) * 9); ctx.quadraticCurveTo(p.x + Math.cos(a) * 8, p.y - 6, p.x + Math.cos(a + 0.6) * 10, p.y - 22 + i % 3 * 6); ctx.stroke(); } this.wtext(p.x, p.y - 66, 'ROOTED — dash to break!', '#a8e070', 11); }
-    if (p.frozen > 0) { ctx.fillStyle = 'rgba(170,225,255,.55)'; ctx.fillRect(sn(p.x) - 24, sn(p.y) - 57, 48, 69); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.strokeRect(sn(p.x) - 24, sn(p.y) - 57, 48, 69); ctx.fillStyle = '#ffffff'; ctx.fillRect(sn(p.x) - 18, sn(p.y) - 51, 6, 18); this.wtext(p.x, p.y - 66, 'FROZEN — dash to break!', '#bfe8ff', 11); }
-    if (p.chill > 0) for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.chill ? '#9fe6ff' : 'rgba(255,255,255,.25)'; ctx.fillRect(sn(p.x) - 12 + i * 9, sn(p.y) - 66, 6, 6); }
+    if (p.goldT > 0) this.hourglass(ctx, p.x, p.y - 69 - z, 1 - p.goldT / (p.goldT0 || 1));
+    if (p.shield > 0 && !(p.goldT > 0)) { ctx.strokeStyle = rgba('#e6d29a', 0.35 + 0.15 * Math.sin(t * 7)); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y - 14 - z, 30, 33, 0, 0, 7); ctx.stroke(); }
+    if (p.rooted > 0) { ctx.strokeStyle = '#5a8a2a'; ctx.lineWidth = 4; for (let i = 0; i < 6; i++) { const a = i * 1.05 + 0.3; ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * 22, p.y + 10 + Math.sin(a) * 9); ctx.quadraticCurveTo(p.x + Math.cos(a) * 8, p.y - 6, p.x + Math.cos(a + 0.6) * 10, p.y - 22 + i % 3 * 6); ctx.stroke(); } this.wtext(p.x, p.y - 57, 'ROOTED — dash to break!', '#a8e070', 11); }
+    if (p.frozen > 0) { ctx.fillStyle = 'rgba(170,225,255,.55)'; ctx.fillRect(sn(p.x) - 24, sn(p.y) - 48, 48, 60); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.strokeRect(sn(p.x) - 24, sn(p.y) - 48, 48, 60); ctx.fillStyle = '#ffffff'; ctx.fillRect(sn(p.x) - 18, sn(p.y) - 42, 6, 18); this.wtext(p.x, p.y - 57, 'FROZEN — dash to break!', '#bfe8ff', 11); }
+    if (p.chill > 0) for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.chill ? '#9fe6ff' : 'rgba(255,255,255,.25)'; ctx.fillRect(sn(p.x) - 12 + i * 9, sn(p.y) - 57, 6, 6); }
     // vũ khí: có lấy đà (khi tụ lực) và theo đà (vung quá rồi dừng)
-    ctx.save(); ctx.translate(p.x, p.y - 10 - z); ctx.rotate(p.aim);
+    ctx.save(); ctx.translate(p.x, p.y + HAND_Y - z); ctx.rotate(p.aim);
     const skw = p.skin ? skinWeapon(p.cls, p.skin, Math.floor(t / 0.12)) : null;   // vũ khí riêng của skin (Rare trở lên)
     if (p.cls === 'KNIGHT') {
       const dir = p.swingDir || 1, back = (s2) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(s2 - 1, 3) + c1 * Math.pow(s2 - 1, 2); };
@@ -688,7 +689,7 @@ export class Renderer {
     }
     ctx.restore();
     if (skb && p.charge > 0.05) SKV.charge(this, ctx, p, skb, t, sim);
-    if (p.cls === 'MAGE') { const a = p.aim + (this._tipA || 0); this._mzT = Math.max(0, (this._mzT || 0) - (this.dtNow || 0.016)); SKV.muzzle(this, ctx, p.x + Math.cos(a) * this._tipD, p.y - 10 - z + Math.sin(a) * this._tipD, p.skinFx ? p.skinFx.theme : '', p.charge || 0, this._mzT / 0.1, t); }   // mọi Pháp sư: tia sáng pixel ở đầu trượng, không còn quả cầu tròn mờ
+    if (p.cls === 'MAGE') { const a = p.aim + (this._tipA || 0); this._mzT = Math.max(0, (this._mzT || 0) - (this.dtNow || 0.016)); SKV.muzzle(this, ctx, p.x + Math.cos(a) * this._tipD, p.y + HAND_Y - z + Math.sin(a) * this._tipD, p.skinFx ? p.skinFx.theme : '', p.charge || 0, this._mzT / 0.1, t); }   // mọi Pháp sư: tia sáng pixel ở đầu trượng, không còn quả cầu tròn mờ
     if (p.charge > 0.05) {
       const c = p.charge, ready = p.cls === 'RANGER' ? c >= 0.75 : p.cls === 'KNIGHT' ? c >= 0.7 : c >= 0.98;
       const bh = p.cls === 'MAGE' && p.mods && p.mods.blackHole;
@@ -696,7 +697,7 @@ export class Renderer {
       if (bh) { const m = -Math.PI / 2 + 0.9 * 6.283; ctx.fillStyle = '#c8a8ff'; ctx.fillRect(p.x + Math.cos(m) * 28 - 3, p.y - 8 + Math.sin(m) * 28 - 3, 6, 6); }   // vạch 90% = đủ lực tạo hố đen
       if (p.cls === 'RANGER') { ctx.fillStyle = '#fff6a0'; const m = -Math.PI / 2 + 0.75 * 6.283; ctx.fillRect(p.x + Math.cos(m) * 28 - 2, p.y - 8 + Math.sin(m) * 28 - 2, 4, 4); ctx.save(); ctx.globalAlpha = 0.25 + 0.4 * c; ctx.strokeStyle = ready ? '#fff6a0' : '#ffffff'; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x + Math.cos(p.aim) * (300 + 400 * c), p.y - 8 + Math.sin(p.aim) * (300 + 400 * c)); ctx.stroke(); ctx.restore(); }
       if (p.cls === 'KNIGHT') { const R = 110 + 100 * c, A = 1.6 + 1.6 * c; ctx.save(); ctx.globalAlpha = 0.12 + 0.18 * c; ctx.fillStyle = ready ? '#ffd36b' : '#ffffff'; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, R, p.aim - A / 2, p.aim + A / 2); ctx.closePath(); ctx.fill(); if (c >= 0.7) { ctx.globalAlpha = 0.25; ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, R + 150, 0, 7); ctx.stroke(); } ctx.restore(); }
-      if (false) { const rr = 8 + 14 * c, ox = p.x + Math.cos(p.aim - 0.5 * (p.face || 1)) * 56, oy = p.y - 10 + Math.sin(p.aim - 0.5 * (p.face || 1)) * 56; ctx.fillStyle = 'rgba(155,140,255,.35)'; ctx.beginPath(); ctx.arc(ox, oy, rr + 6, 0, 7); ctx.fill(); ctx.fillStyle = '#c8b8ff'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ox - rr * 0.3, oy - rr * 0.3, rr * 0.3, 0, 7); ctx.fill(); }
+      if (false) { const rr = 8 + 14 * c, ox = p.x + Math.cos(p.aim - 0.5 * (p.face || 1)) * 56, oy = p.y + HAND_Y + Math.sin(p.aim - 0.5 * (p.face || 1)) * 56; ctx.fillStyle = 'rgba(155,140,255,.35)'; ctx.beginPath(); ctx.arc(ox, oy, rr + 6, 0, 7); ctx.fill(); ctx.fillStyle = '#c8b8ff'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ox - rr * 0.3, oy - rr * 0.3, rr * 0.3, 0, 7); ctx.fill(); }
     }
   }
   status(ctx, e, sc) {

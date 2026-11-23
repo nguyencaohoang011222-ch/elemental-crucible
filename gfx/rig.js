@@ -81,7 +81,15 @@ export function heroGrid(cls, P) {
   applyLayer(K, 'front');
   return g;
 }
-function drawHero(cls, P) { return heroGrid(cls, P).canvas(); }
+// chibi trong trận: bỏ 3 hàng chân/vạt áo (hàng 15–17), dồn đầu + thân xuống 3 hàng, chân luôn ở hàng 20.
+// cùng tỉ lệ với sprite Shop (đầu to, thân chắc, chân ngắn). Diorama Shop vẫn gọi heroGrid gốc.
+export const CHIBI_DROP = 3;
+export function chibiGrid(g) {
+  const W = g.w, cut = 17 + HERO_MY, d = g.d.slice();
+  for (let y = cut; y >= 0; y--) for (let x = 0; x < W; x++) d[y * W + x] = y - CHIBI_DROP >= 0 ? g.d[(y - CHIBI_DROP) * W + x] : null;
+  g.d = d; return g;
+}
+function drawHero(cls, P) { return chibiGrid(heroGrid(cls, P)).canvas('#141013'); }
 // vũ khí theo skin (ma trận pixel từ skinlooks), có khung hoạt ảnh cho vũ khí phát sáng / lửa
 const SKW = new Map();
 export function skinWeapon(cls, id, f = 0) {
@@ -99,10 +107,9 @@ export function heroPose(p, t, moving) {
   } else if ((p.z || 0) > 2 || p.leap) {
     P.ly = -2; P.ry = -2; P.aly = -2; P.ary = -2; P.by = -1; P.cape = 2;
   } else if (moving) {
-    const f = Math.floor(t / 0.085) % 6, ph = f / 6 * Math.PI * 2;
-    P.lx = Math.round(Math.sin(ph) * 1.6); P.rx = Math.round(Math.sin(ph + Math.PI) * 1.6);
-    P.ly = Math.cos(ph) > 0.4 ? -1 : 0; P.ry = Math.cos(ph + Math.PI) > 0.4 ? -1 : 0;
-    P.by = f % 3 === 1 ? -1 : 0; P.alx = -P.lx >> 1; P.arx = -P.rx >> 1; P.cape = 1 + (f & 1); P.hem = f < 3 ? 1 : -1;
+    const f = Math.floor(t / 0.11) % 4;   // nhịp nhún chibi 4 khung: chân luân phiên, bật lên giữa bước
+    P.lx = [1, 0, -1, 0][f]; P.rx = -P.lx; P.ly = f === 0 ? -1 : 0; P.ry = f === 2 ? -1 : 0;
+    P.by = f & 1 ? -1 : 0; P.alx = -P.lx; P.arx = -P.rx; P.cape = 1 + (f & 1); P.hem = f < 2 ? 1 : -1;
   } else {
     const f = Math.floor(t / 0.24) % 4; P.by = f >= 2 ? 1 : 0; P.cape = f === 3 ? 1 : 0;
     if (t % 3.1 < 0.13) P.eyes = 'closed';

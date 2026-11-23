@@ -4,6 +4,7 @@ import { EL, EL_INFO, GROUP_COLOR, GROUP_NAME, KITS, skillDef, triDef, coreEls, 
 import { Renderer } from './render.js';
 import * as AU from './audio.js';
 import { iconSkill, iconUpgrade, iconElement } from './gfx/icons.js';
+import { infuseDef } from './kits.js';
 import { heroPortrait } from './gfx/portraits.js';
 import { renderPixelIcon as PXI, hydratePixelIcons } from './gfx/pixelIcons.js';
 import { drawDiorama, hasDiorama } from './gfx/dioramas.js';
@@ -123,7 +124,7 @@ let defBow = null;
 function heroPreview(cls, skin) {
   const fr = R.rig.frame('h', cls + (skin ? ':' + skin : ''), { by: 0, eyes: 'open' }).img, c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height + 2;
   const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(fr, 0, 2);
-  const sw = skin ? skinWeapon(cls, skin, 0) : null, hx = 11 + HERO_MX, hy = 16 + HERO_MY;
+  const sw = skin ? skinWeapon(cls, skin, 0) : null, hx = 11 + HERO_MX, hy = 16 + 3 + HERO_MY;   // +3: chibi đã dồn thân xuống 3 hàng
   if (cls === 'RANGER') { const img = sw ? sw.img : (defBow = defBow || bowGrid({}).canvas()); g.drawImage(img, hx - 6, hy - 10); }
   else { const img = sw ? sw.img : weapon(cls === 'KNIGHT' ? 'sword' : 'staff'); g.save(); g.translate(hx, hy + (cls === 'MAGE' ? 5 : 0)); g.rotate(-Math.PI / 2); g.drawImage(img, cls === 'MAGE' ? -1 : -2, -Math.floor(img.height / 2)); g.restore(); }
   return c;
@@ -471,8 +472,38 @@ function renderControls() {
     [K, 'Your 4 skill slots. <b>One press casts</b> the skill on that slot. Skills cost <b>energy</b> (blue bar); basic hits refill it.'],
     ['<kbd>Tab</kbd> / <kbd>I</kbd>', 'Open your bag (pauses the game): merge 2 different cores into a two-element skill, 3 singles into an ultimate, or a merged skill + 1 single to infuse it. Drag cores to choose which 4 are on your bar.'],
     ['<kbd>Esc</kbd> / <kbd>P</kbd>', 'Pause.'], ['<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>', 'Pick an upgrade card.'], ['<kbd>M</kbd>', 'Mute.']);
-  $('keystable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  const keys = '<table class="keys" style="width:100%">' + rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('') + '</table>';
+  // hướng dẫn cho người mới: cơ bản · điều khiển · ghép lõi · mẹo
+  const cls = (game && game.p && game.p.cls) || runCfg.cls;
+  const el = e => '<span class="gel" style="color:' + EL_INFO[e].color + '"><img src="' + iconElement(e) + '" alt="">' + EL_INFO[e].name + '</span>';
+  const res = (txt, sk) => '<span class="gres">' + (sk ? '<img src="' + iconSkill(sk) + '" alt="">' : '') + txt + '</span>';
+  const safe = f => { try { return f(); } catch (e) { return null; } };
+  const duo = safe(() => skillDef(cls, 'FIRE', 'WATER')), tri = safe(() => triDef(cls, ['FIRE', 'WATER', 'EARTH'])), inf = safe(() => infuseDef(cls, ['FIRE', 'WATER'], 'WIND'));
+  const sec = (icon, title, body) => '<div class="gsec"><h4>' + PXI(icon, 16) + title + '</h4>' + body + '</div>';
+  const OP = s => '<span class="gop">' + s + '</span>', CN = (CLASSES[cls] || {}).name || cls;
+  const T = {
+    basics: sec('swords', 'Your goal', '<p>Fight through <b>' + LAST_STAGE + ' stages</b>. Every 5th stage is a <b>Titan</b> boss; beat the last one to win the run.</p>')
+      + sec('play', 'A stage, step by step', '<ol class="gsteps"><li>Enemies come in <b>waves</b>. Clear them all to finish the stage.</li><li>Pick <b>1 of 3 upgrade cards</b>. Some cards give a new <b>element core</b> (a new skill).</li><li>After a Titan falls, collect the loot and <b>walk into the gate</b> to reach the next biome.</li></ol>')
+      + sec('bolt', 'Energy and skills', '<p>Skills cost <b>energy</b> (the blue bar). Basic attacks refill it, so keep hitting between casts.</p><p>You have <b>4 skill slots</b> (' + [0, 1, 2, 3].map(i => '<kbd>' + slotLabel(i) + '</kbd>').join(' ') + ') and <b>6 bag slots</b> for spare cores.</p>')
+      + sec('coin', 'Gold, smiths and relics', '<p>Enemies drop <b>gold</b>. Sometimes a <b>smith</b> camps nearby: buy stat boosts, forge (upgrade) a skill, or take one <b>Cursed Relic</b>. Relics are strong but always come with a price.</p>')
+      + sec('gem', 'After a run', '<p>Win or lose, you earn <b>gems</b>. Spend them in <b>Shop &amp; Skins</b>. Daily Quests give extra gems.</p>'),
+    controls: keys,
+    merge: sec('sparkle', 'What is merging?', '<p>Each <b>core</b> is one element: Fire, Water, Earth or Wind. Open the <b>Bag</b> (<kbd>Tab</kbd>), click cores to put them on the merge table, then press <b>Merge</b>. A merged skill is stronger than its parts and does more.</p><p>The examples below use your hero, <b>' + CN + '</b>.</p>')
+      + sec('flame', 'Recipes', '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('→') + res('Two-element skill' + (duo ? ': ' + duo.name : ''), duo) + '<span class="gnote">2 single cores of <b>different</b> elements. Order matters: the first core sets the main effect.</span></div>'
+        + '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('+') + el('EARTH') + OP('→') + res('Ultimate' + (tri ? ': ' + tri.name : ''), tri) + '<span class="gnote">3 single cores, all different. Costs <b>1 Fusion Shard</b> ◆ (break purple crystals or defeat elites).</span></div>'
+        + '<div class="grec">' + res('Two-element skill') + OP('+') + el('WIND') + OP('→') + res('Infused skill' + (inf ? ': ' + inf.name : ''), inf) + '<span class="gnote">A merged skill plus 1 single core adds a third element on top.</span></div>')
+      + sec('lock', 'What can\'t be merged', '<ul><li>Two cores of the <b>same</b> element.</li><li>Two merged skills together.</li><li>Ultimates and infused skills: they are final.</li></ul>')
+      + sec('bag', 'Merge tips', '<ul><li>Click 2 or 3 cores and the table <b>previews the result</b> before you merge.</li><li>Drag cores between the bar and the bag to choose your 4 active skills.</li><li>Opening the Bag pauses the game, so merge whenever you like.</li></ul>'),
+    tips: sec('heart', 'Staying alive', '<ul><li><kbd>Space</kbd> dash makes you <b>invincible</b>: dash through boss attacks and shockwaves.</li><li>Coloured marks on the ground show where an attack will land. Step out of them.</li><li>Potions heal. The smith sells more.</li></ul>')
+      + sec('star', 'Getting stronger', '<ul><li>Merge early: one merged skill beats two single ones.</li><li>Hold left-click to <b>charge</b> your basic attack for big hits.</li><li>Read a relic\'s price before you buy it. Open the Bag any time to check your build.</li></ul>')
+  };
+  const TABS = [['basics', 'Basics'], ['controls', 'Controls'], ['merge', 'Merging'], ['tips', 'Tips']];
+  if (!T[guideTab]) guideTab = 'basics';
+  $('guidetabs').innerHTML = TABS.map(([k, n]) => '<button data-g="' + k + '" class="' + (k === guideTab ? 'on' : '') + '">' + n + '</button>').join('');
+  for (const b of $('guidetabs').children) b.onclick = () => { guideTab = b.dataset.g; renderControls(); };
+  $('guidebody').innerHTML = T[guideTab]; $('guidebody').scrollTop = 0;
 }
+let guideTab = 'basics';
 
 // ---------- tạo lượt mới ----------
 let nrStep = 1, nrCls = runCfg.cls, nrEl = runCfg.element, nrDiff = runCfg.difficulty;
