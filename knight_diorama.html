@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vanguard Showcase Card</title>
+<style>
+:root{--bg:#0b0c12;--card:#12141c;--line:#262b3a;--fg:#ece6dc;--mut:#8e93a4;--acc:#ff9e44;--gold:#e0b040}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#0b0c12;--card:#12141c}}
+:root[data-theme="dark"]{--bg:#0b0c12}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);font:14px/1.45 ui-monospace,Consolas,monospace;display:grid;place-items:center;padding:16px}
+.card{width:min(100%,544px);background:var(--card);border:2px solid #0b0a14;box-shadow:0 0 0 2px var(--line),0 0 0 4px #0b0a14,0 20px 50px #000c}
+canvas{display:block;width:100%;aspect-ratio:4/3;image-rendering:pixelated}
+.bar{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-top:2px solid #0b0a14}
+.n{font-weight:700;letter-spacing:.1em;color:var(--acc)}.t{color:var(--gold);font-size:12px;letter-spacing:.2em}
+.ctl{display:flex;gap:8px;justify-content:center;margin-top:12px;color:var(--mut);font-size:12px}
+button{font:inherit;color:var(--fg);background:#1a1d28;border:1px solid var(--line);padding:4px 10px;cursor:pointer}
+</style></head><body>
+<div><div class="card"><canvas id="c" width="512" height="384" aria-label="Vanguard knight idle diorama"></canvas>
+<div class="bar"><span class="n">VANGUARD</span><span class="t">KNIGHT</span></div></div>
+<div class="ctl"><button id="pp">Pause</button><button id="st">Step</button><span id="fl">frame 1/4</span></div></div>
+<script>
+// Everything is drawn into ONE 64×48 buffer (1 cell = 1 pixel), then scaled ×8 with smoothing off.
+const GW = 64, GH = 48, FLOOR = 36;
+const PAL = {
+  '0': '#0b0a14', // outline
+  '1': '#09080f', // contact shadow
+  '2': '#0d1018', // deep slate
+  '3': '#141824', // castle archway stone
+  '4': '#1e2332', // stone edge (muted)
+  '5': '#181a22', // floor mortar
+  '6': '#272a34', // floor stone
+  '7': '#373b48', // floor stone top edge
+  'S': '#454d60', // steel shadow
+  's': '#8a94a8', // steel
+  'L': '#d4dae6', // steel light
+  'O': '#ff9e44', // torch rim light
+  'W': '#ffffff', // blade glint
+  'R': '#d0302c', // plume
+  'r': '#7a1418', // plume shadow
+  '8': '#16245e', // tunic shadow
+  '9': '#2c46a8', // tunic blue
+  'A': '#4a6ad8', // tunic light
+  'G': '#e0b040', // gold
+  'g': '#8a6420', // gold shadow
+  'c': '#4e0c12', // cape shadow
+  'C': '#8e1a20', // cape
+  'D': '#c03428', // cape light fold
+  'K': '#05040a', // visor slit
+  'Y': '#ffd27a', // eyes
+  'N': '#3e2414', // grip leather
+  'T': '#3a2418', // torch warm wall glow
+  't': '#5a3418', // torch sconce
+  'f': '#ffd060', // flame core
+  'F': '#ff7a1e', // flame
+};
+const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const dth = (x, y, t) => t * 16 > BAY[((y & 3) << 2) | (x & 3)] + 0.5;
+const hsh = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+// ---------- Knight sprite (hand-authored matrix, faces right; '.' = empty) ----------
+const BODY = [
+  '..........rRR.............',
+  '........rrRRRR......L.....',
+  '......rrRRRRRRR....SLO....',
+  '.....rRRrRRRRR.....SsL....',
+  '....rRr.rSssssL....SsL....',
+  '....rr..SSssssLO...SsO....',
+  '....r..SSsssssLO...SsO....',
+  '......SSssssssLLO..SsL....',
+  '......SSsssssssLO..SsL....',
+  '......SKKKKKKKKKO..SsL....',
+  '......SKKKYYKKYYO..SsL....',
+  '......SSsssssssLO..SsL....',
+  '......SSsSsSsSsLO..SsL....',
+  '.......SSsssssLO...SsL....',
+  '...cSSsgGGGGGGGGO..SsL....',
+  '..cCSSsS999ASsLO...SsL....',
+  '.cCcSSS899G9SssLO..SsL....',
+  '.cCcc.8899G99SsLO..SsL....',
+  'cCCDc.8899G99ASsO..SsL....',
+  'cCCDc.8899G999ASsO.SsL....',
+  'cCDCc.8899G9999ASsOSsL....',
+  'cCDCc.8899G9999AgGGGGGGGO.',
+  'ccDCc.gGGGGGGGSssSssNsO...',
+  'cCDCcc8999G99999SsssNsO...',
+  'cCDCcc899G999999AO..N.....',
+  'cCCDc.ggGGGGGGGGGO..G.....',
+  'cCCDCc.8SsS..SsLO.........',
+  '.cCDCc..SsS..SsLO.........',
+  '.cCDCc..SsS...SsLO........',
+  '..cCDc..SsS...SsLO........',
+  '..cCCc.SSsS...SSsLO.......',
+  '...cCc.SSsS...SSsLO.......',
+  '....cc.SSSsS..SSSsLO......',
+  '.......SSSSS..SSSSSO......',
+];
+const SPLIT = 26;                // rows above this bob on the exhale; legs stay planted
+const SX = 19, SY = 5;
+const BLADE_X = SX + 21;         // blade's lit column (for the travelling glint)
+
+// ---------- static background (slate castle archway + stone floor) ----------
+const BG = [];
+for (let y = 0; y < GH; y++) { BG.push([]); for (let x = 0; x < GW; x++) BG[y].push('3'); }
+// big round archway: dark passage inside, stone voussoirs around it
+const AX = 31, AR = 15, ASPR = 18;
+for (let y = 0; y < FLOOR; y++) for (let x = 0; x < GW; x++) {
+  const dx = x + 0.5 - AX, inside = y >= ASPR ? Math.abs(dx) < AR : Math.hypot(dx, y - ASPR) < AR;
+  const ring = y >= ASPR ? Math.abs(dx) < AR + 3 : Math.hypot(dx, y - ASPR) < AR + 3;
+  if (inside) BG[y][x] = (y > FLOOR - 7 && dth(x, y, (y - (FLOOR - 7)) / 12)) ? '3' : '2';
+  else if (ring) { const a = Math.atan2(y - ASPR, dx), seg = Math.floor((a + Math.PI) / 0.32); BG[y][x] = (y < ASPR && seg % 2 === 0) || (y >= ASPR && ((y >> 2) & 1)) ? '4' : '3'; }
+  else { const row = y >> 2, seam = (y & 3) === 3 || ((x + row * 4) % 9 === 0); BG[y][x] = seam ? '2' : '3'; }   // wall bricks
+}
+// wall torch on the right pillar: sconce + warm dithered wall glow
+const TX = 54, TY = 15;
+for (let y = TY - 8; y < TY + 8; y++) for (let x = TX - 8; x < TX + 9; x++) { const d = Math.hypot(x - TX, (y - TY + 1) * 1.15); if (BG[y] && BG[y][x] && (d < 3.6 || (d < 6.5 && BG[y][x] !== '2' && dth(x, y, 0.5 - (d - 3.6) * 0.12)))) BG[y][x] = 'T'; }
+for (const [x, y] of [[TX - 1, TY + 1], [TX, TY + 1], [TX + 1, TY + 1], [TX, TY + 2], [TX, TY + 3]]) BG[y][x] = 't';
+// stone floor: bottom 12 rows
+for (let y = FLOOR; y < GH; y++) for (let x = 0; x < GW; x++) {
+  const row = Math.floor((y - FLOOR) / 4), seamV = (x + row * 6) % 12 === 0, seamH = (y - FLOOR) % 4 === 3;
+  BG[y][x] = y === FLOOR ? '7' : seamH || seamV || hsh(x >> 1, y) < 0.1 ? '5' : '6';
+}
+
+// ---------- compose one frame on the 64×48 grid ----------
+function frame(f) {
+  const G = BG.map(r => r.slice());
+  const bob = f >= 2 ? 1 : 0;
+  // torch flame flickers between two shapes
+  const FL = f % 2 ? [[0, -3, 'F'], [0, -2, 'f'], [-1, -1, 'F'], [0, -1, 'f'], [1, -1, 'F'], [0, 0, 'F']] : [[1, -3, 'F'], [0, -2, 'F'], [1, -2, 'f'], [-1, -1, 'F'], [0, -1, 'f'], [1, -1, 'F'], [0, 0, 'F']];
+  for (const [dx, dy, c] of FL) G[TY + dy][TX + dx] = c;
+  // warm floor spill below the torch side
+  for (let y = FLOOR + 1; y < FLOOR + 5; y++) for (let x = 44; x < GW; x++) if (G[y][x] === '6' && dth(x, y, Math.max(0, 1 - Math.hypot((x - 55) / 10, (y - FLOOR) / 4)) * (f % 2 ? 0.45 : 0.55))) G[y][x] = 'T';
+  // contact shadow under the boots
+  const foot = SY + BODY.length - 1, scx = SX + 12;
+  for (let y = foot - 1; y <= foot + 2; y++) for (let x = 0; x < GW; x++) if (((x + 0.5 - scx) / 11) ** 2 + ((y + 0.5 - (foot + 0.6)) / 1.9) ** 2 < 1) G[y][x] = '1';
+
+  const L = Array.from({ length: GH }, () => new Array(GW).fill('.'));
+  const put = (x, y, c) => { if (c !== '.' && x >= 0 && y >= 0 && x < GW && y < GH) L[y][x] = c; };
+  BODY.forEach((row, r) => { const dy = r < SPLIT ? bob : 0; [...row].forEach((c, i) => put(SX + i, SY + r + dy, c)); });
+  // cape hem ripples in the draft (two states)
+  if (f % 2) { put(SX, SY + 26, 'c'); put(SX + 1, SY + 30, 'c'); } else { put(SX + 1, SY + 33, 'c'); put(SX + 2, SY + 33, 'C'); }
+  // metallic glint travelling down the blade
+  const gy = SY + 2 + f * 4 + bob; put(BLADE_X, gy, 'W'); if (f === 1) put(BLADE_X + 1, gy, 'O');
+  // 1px outline
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (L[y][x] === '.' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => L[y + b] && L[y + b][x + a] && L[y + b][x + a] !== '.')) G[y][x] = '0';
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (L[y][x] !== '.') G[y][x] = L[y][x];
+  // 3 embers rising from the torch (1×1 cells)
+  for (const [dx, ph, c] of [[-2, 0, 'O'], [2, 1, 'f'], [0, 2, 'F']]) { const k = (f + ph) % 4, x = TX + dx + (k >> 1) * Math.sign(dx || 1), y = TY - 5 - k * 2; if (G[y] && G[y][x] && '234T'.includes(G[y][x])) G[y][x] = c; }
+  return G;
+}
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), buf = document.createElement('canvas');
+buf.width = GW; buf.height = GH; const bx = buf.getContext('2d');
+const FR = [0, 1, 2, 3].map(frame);
+let f = 0, run = true;
+function draw() {
+  const G = FR[f];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { bx.fillStyle = PAL[G[y][x]]; bx.fillRect(x, y, 1, 1); }
+  ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(buf, 0, 0, cv.width, cv.height);
+  document.getElementById('fl').textContent = 'frame ' + (f + 1) + '/4';
+}
+draw();
+setInterval(() => { if (run) { f = (f + 1) % 4; draw(); } }, 1000 / 6);   // 6 FPS
+document.getElementById('pp').onclick = e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; };
+document.getElementById('st').onclick = () => { run = false; document.getElementById('pp').textContent = 'Play'; f = (f + 1) % 4; draw(); };
+window.__frame = i => { run = false; f = i; draw(); };
+</script></body></html>
