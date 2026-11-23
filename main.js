@@ -35,7 +35,10 @@ const SET = { master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake:
 try { Object.assign(SET, JSON.parse(localStorage.getItem('ea-settings') || '{}')); } catch (e) { /* trình duyệt chặn lưu trữ */ }
 function saveSet() { try { localStorage.setItem('ea-settings', JSON.stringify(SET)); } catch (e) { /* bỏ qua */ } R.opts.shake = SET.shake; R.opts.numbers = SET.numbers; R.opts.fps = SET.fps; R.opts.light = SET.light; AU.setVolumes(SET.master / 100, SET.sfx / 100, SET.music / 100); AU.setMusicOn(SET.musicOn); AU.setSfxOn(SET.sfxOn); }
 saveSet();
-function fit() { R.resize(innerWidth, innerHeight); }
+// camera khoá tầm nhìn: luôn thấy đúng VIEW_ROWS pixel game theo chiều dọc (≈800 đơn vị thế giới ≈ 16.7 ô), bất kể cỡ cửa sổ / toàn màn hình / devicePixelRatio.
+// canvas vẽ ở độ phân giải VIEW_ROWS×P (P nguyên → pixel đều), CSS kéo giãn cho vừa cửa sổ; chiều ngang theo tỉ lệ màn hình.
+const VIEW_ROWS = 267;
+function fit() { const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight), P = Math.max(2, Math.round(h / VIEW_ROWS)), H = VIEW_ROWS * P; R.fixedP = P; R.resize(Math.round(w * H / h), H); }
 addEventListener('resize', fit); fit();
 
 // ---------- âm thanh: xem audio.js (hiệu ứng 8-bit + nhạc chiptune) ----------
