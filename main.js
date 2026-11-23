@@ -22,6 +22,7 @@ import { Grid } from './gfx/pixel.js';
 import * as FG from './forge.js';
 import * as RL from './relics.js';
 import * as ON from './online.js';
+import * as TM from './mobile.js';
 import { forgeInfo } from './forgeups.js';
 import { MINOR_BY_ID } from './upgrades.js';
 import { STAT_DROPS } from './game.js';
@@ -33,7 +34,7 @@ const cv = $('c'), R = new Renderer(cv);
 
 // ---------- cài đặt (lưu trên máy) ----------
 const SET = { master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake: true, numbers: true, hints: true, autopause: true, control: 'wasd', fps: false, light: true };
-try { Object.assign(SET, JSON.parse(localStorage.getItem('ea-settings') || '{}')); } catch (e) { /* trình duyệt chặn lưu trữ */ }
+{ let saved = {}; try { saved = JSON.parse(localStorage.getItem('ea-settings') || '{}'); } catch (e) { /* trình duyệt chặn lưu trữ */ } Object.assign(SET, saved); if (!saved.control && matchMedia('(pointer: coarse)').matches) SET.control = 'touch'; }   // máy cảm ứng: lần đầu tự chọn điều khiển Touch
 function saveSet() { try { localStorage.setItem('ea-settings', JSON.stringify(SET)); } catch (e) { /* bỏ qua */ } R.opts.shake = SET.shake; R.opts.numbers = SET.numbers; R.opts.fps = SET.fps; R.opts.light = SET.light; AU.setVolumes(SET.master / 100, SET.sfx / 100, SET.music / 100); AU.setMusicOn(SET.musicOn); AU.setSfxOn(SET.sfxOn); }
 saveSet();
 // camera khoá tầm nhìn: luôn thấy đúng VIEW_ROWS pixel game theo chiều dọc (≈800 đơn vị thế giới ≈ 16.7 ô), bất kể cỡ cửa sổ / toàn màn hình / devicePixelRatio.
@@ -59,7 +60,7 @@ const modals = [];
 
 function openModal(id) { if (!modals.includes(id)) modals.push(id); $(id).classList.add('on'); }
 function closeModal(id) { id = id || modals[modals.length - 1]; if (!id) return; $(id).classList.remove('on'); const i = modals.indexOf(id); if (i >= 0) modals.splice(i, 1); }
-function resetInput() { slotQ = []; dashQ = false; moveTo = null; attackT = null; marker = null; mouse.down = mouse.rdown = false; keys.clear(); }
+function resetInput() { slotQ = []; dashQ = false; moveTo = null; attackT = null; marker = null; mouse.down = mouse.rdown = false; keys.clear(); TM.resetTouch(); }
 function ensureAudio() { AU.ensure(); }
 addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensureAudio);
 
@@ -82,7 +83,7 @@ function startLab(cfg) {
   Object.assign(game, keep);
   enterPlay(); showLab(true);
 }
-initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), gems: n => { PR.addGems(n, 'Lab'); showHint('💎 ' + PR.P.gems, 2); }, resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
+initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
 // dải chiêu Test Lab: kéo thẳng lên ô nào trên thanh chiêu thì thay ô đó
 function buildLabStrip() {
   const S = $('labstrip'); S.innerHTML = ''; const all = [];
@@ -433,6 +434,7 @@ document.addEventListener('click', e => {
   else if (act === 'daily') openDaily();
   else if (act === 'leader') openLeader();
   else if (act === 'settings') openSettings();
+  else if (act === 'fullscreen') { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { try { screen.orientation.lock('landscape'); } catch (e) { /* trình duyệt không cho khoá */ } }).catch(() => {}); }
   else if (act === 'controls') { renderControls(); openModal('controls'); }
   else if (act === 'resume') resume();
   else if (act === 'restart') { if (ui === 'end') { closeModal('end'); closeModal('victory'); if (isTraining) startTraining(); else openNewRun(); } else confirmBox('Restart?', 'This run will be lost.', () => isTraining ? startTraining() : startRun(runCfg)); }
@@ -461,9 +463,14 @@ function renderAudio(el) {
 $('audiobtn').onclick = e => { e.stopPropagation(); const P = $('audiopop'); P.classList.toggle('hidden'); if (!P.classList.contains('hidden')) renderAudio(P); };
 $('audiopop').addEventListener('mousedown', e => e.stopPropagation());
 // ---------- kiểu điều khiển ----------
-function syncControl() { for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.classList.toggle('on', x.dataset.c === SET.control); qw.dataset.sig = ''; }
-for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.onclick = () => { SET.control = x.dataset.c; saveSet(); syncControl(); moveTo = attackT = null; };
+// nút chuyển nhanh PC ⇄ Mobile: nhớ kiểu PC dùng gần nhất (WASD hoặc chuột phải) để chuyển về đúng kiểu đó
+function toggleControl() { if (SET.control === 'touch') SET.control = SET.lastDesk || 'wasd'; else { SET.lastDesk = SET.control; SET.control = 'touch'; } saveSet(); syncControl(); moveTo = attackT = null; showHint(SET.control === 'touch' ? 'Mobile controls: joystick on the left, buttons on the right.' : 'PC controls: ' + (SET.control === 'wasd' ? 'WASD + mouse.' : 'right-click to move.'), 3); if (modals.includes('controls')) renderControls(); }
+for (const id of ['ctlbtn', 'ctlhud']) $(id).onclick = e => { e.stopPropagation(); toggleControl(); };
+function syncControl() { for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.classList.toggle('on', x.dataset.c === SET.control); qw.dataset.sig = '';
+  { const t = SET.control === 'touch', html = PXI(t ? 'phone' : 'keyboard', 16) + '<span>' + (t ? 'Mobile' : 'PC') + '</span>'; for (const id of ['ctlbtn', 'ctlhud']) { const b = $(id); b.innerHTML = html; b.title = 'Controls: ' + (t ? 'Mobile' : 'PC') + ' (tap to switch)'; } } document.body.classList.toggle('touch', SET.control === 'touch'); TM.markTouchDirty(); TM.resetTouch(); }
+for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.onclick = () => { if (x.dataset.c !== 'touch') SET.lastDesk = x.dataset.c; SET.control = x.dataset.c; saveSet(); syncControl(); moveTo = attackT = null; };
 function renderControls() {
+  if (TM.touchOn()) return renderGuide([['<kbd>Left side</kbd>', 'Touch anywhere on the left half and drag: a joystick appears under your thumb.'], ['<kbd>Big button</kbd>', 'Tap to attack the nearest enemy. <b>Hold to charge</b>, release to strike. Slide your thumb off the button to aim by hand.'], ['<kbd>Skill buttons</kbd>', '<b>Tap</b> to cast at the nearest enemy. <b>Drag</b> to aim (a line shows where it lands), release to cast. Drag back to the centre of the button to cancel.'], ['<kbd>Boot button</kbd>', 'Dash where the joystick points (toward your target when standing still). Invincible while dashing.'], ['<kbd>Potions</kbd>', 'Tap the small red / blue buttons to drink.'], ['<kbd>Bag</kbd>', 'Pauses the game. Tap 2–3 cores to merge, or tap 2 cores and press Swap to reorder.']]);
   const w = SET.control === 'wasd', K = [0, 1, 2, 3].map(i => '<kbd>' + slotLabel(i) + '</kbd>').join(' ');
   const rows = w ? [['<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>', 'Move. Your attacks and skills always aim at the cursor.']]
     : [['<kbd>Right-click</kbd>', 'Move there. Hold to follow the cursor. Right-click an enemy to attack it.']];
@@ -472,6 +479,9 @@ function renderControls() {
     [K, 'Your 4 skill slots. <b>One press casts</b> the skill on that slot. Skills cost <b>energy</b> (blue bar); basic hits refill it.'],
     ['<kbd>Tab</kbd> / <kbd>I</kbd>', 'Open your bag (pauses the game): merge 2 different cores into a two-element skill, 3 singles into an ultimate, or a merged skill + 1 single to infuse it. Drag cores to choose which 4 are on your bar.'],
     ['<kbd>Esc</kbd> / <kbd>P</kbd>', 'Pause.'], ['<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>', 'Pick an upgrade card.'], ['<kbd>M</kbd>', 'Mute.']);
+  renderGuide(rows);
+}
+function renderGuide(rows) {
   const keys = '<table class="keys" style="width:100%">' + rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('') + '</table>';
   // hướng dẫn cho người mới: cơ bản · điều khiển · ghép lõi · mẹo
   const cls = (game && game.p && game.p.cls) || runCfg.cls;
@@ -705,6 +715,7 @@ function renderBag() {
       const c = p.cores[i], d = coreCell(i, c, i < BAR_SIZE ? slotLabel(i) : '');
       const o = mSel.indexOf(i); if (o >= 0) { d.classList.add('sel'); d.insertAdjacentHTML('beforeend', `<span class="ord">${o + 1}</span>`); }
       if (c) d.onclick = () => { const k = mSel.indexOf(i); if (k >= 0) mSel.splice(k, 1); else if (mSel.length < 3) mSel.push(i); renderBag(); };
+      else d.onclick = () => { if (mSel.length === 1) { game.swapInv(mSel[0], i); mSel = []; renderBag(); } };   // 1 lõi đang chọn + chạm ô trống = chuyển lõi sang đó (dùng được trên cảm ứng)
       dragWire(d, i, !!c, renderBag);
       row.appendChild(d);
     }
@@ -719,7 +730,7 @@ function renderBag() {
     for (const a of EL) for (const b of EL) if (a !== b) all.push({ type: 'inf', els: [a, b], add: a });
     for (const c of all) { const d = coreCell(-1, c, ''); d.classList.add('mini'); d.draggable = true; d.title += ' — drag onto a skill-bar or bag slot (or click to add)'; d.addEventListener('dragstart', ev => ev.dataTransfer.setData('text/plain', 'core:' + JSON.stringify(c))); d.onclick = () => { const i = game.freeSlot(); if (i < 0) game.p.cores[INV_SIZE - 1] = c; else game.p.cores[i] = c; game.syncOwned(); renderBag(); }; cat.appendChild(d); }
   }
-  const P = $('mprev'), ok = $('mok');
+  const P = $('mprev'), ok = $('mok'); $('mswap').disabled = mSel.length !== 2;
   if (!mSel.length) { P.innerHTML = 'Click 2 or 3 cores to preview what they become.<br><small style="color:var(--dim)">2 different singles → two-element skill · 3 different singles → ultimate · merged skill + single → infused skill</small>'; ok.disabled = true; return; }
   const res = mergeResult(mSel.map(i => p.cores[i]));
   if (res.error) { P.innerHTML = `<span class="err">${res.error}</span>`; ok.disabled = true; return; }
@@ -730,6 +741,7 @@ function renderBag() {
   ok.disabled = noShard;
 }
 $('mclear').onclick = () => { mSel = []; renderBag(); };
+$('mswap').onclick = () => { if (mSel.length !== 2) return; game.swapInv(mSel[0], mSel[1]); mSel = []; renderBag(); };
 $('mrev').onclick = () => { mSel.reverse(); renderBag(); };
 $('mok').onclick = () => { const r = game.mergeCores(mSel.slice()); if (r.error) return; mSel = []; renderBag(); SFX.merge(); game.events.length = 0; showHint(`Merged: ${r.skill.name}${r.slot < BAR_SIZE ? ' on ' + slotLabel(r.slot) : ' (in your bag — drag it onto the bar)'}.`, 5); };
 $('bagclose').onclick = () => closeBag();
@@ -838,7 +850,7 @@ function rightClick() {
   if (e) { attackT = e; moveTo = null; marker = { x: e.x, y: e.y, t: 0.45, c: '#ff5a4a', follow: e }; }
   else { attackT = null; moveTo = w; marker = { x: w.x, y: w.y, t: 0.45, c: '#7fe07a' }; }
 }
-cv.addEventListener('mousedown', e => { toCanvas(e); if (ui !== 'play' || modals.length) return; ensureAudio(); if (e.button === 0 && labMode() && labClick(worldMouse())) return; if (e.button === 0) { mouse.down = true; mouse.pressed = true; } if (e.button === 2 && SET.control === 'mouse') { mouse.rdown = true; rightClick(); } });
+cv.addEventListener('mousedown', e => { toCanvas(e); if (ui !== 'play' || modals.length || TM.touchOn()) return; ensureAudio(); if (e.button === 0 && labMode() && labClick(worldMouse())) return; if (e.button === 0) { mouse.down = true; mouse.pressed = true; } if (e.button === 2 && SET.control === 'mouse') { mouse.rdown = true; rightClick(); } });
 addEventListener('mouseup', e => { if (e.button === 0 && mouse.down) { mouse.down = false; mouse.released = true; } if (e.button === 2) mouse.rdown = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -855,12 +867,12 @@ function autoHint() {
   if (!SET.hints) return '';
   const g = game, p = g.p;
   if (isTraining) return g.casts < 3 ? `Training: each key casts its slot (${[0, 1, 2, 3].map(slotLabel).join(' ')}). Press Tab to open your bag and try merging cores.` : '';
-  if (g.stage === 1 && g.casts === 0) { const s = g.coreSkill(p.cores[0]); return `${SET.control === 'wasd' ? 'Move with WASD. ' : ''}Press ${slotLabel(0)} to cast ${s.name}. Hold left-click to charge your attack.`; }
+  if (g.stage === 1 && g.casts === 0) { const s = g.coreSkill(p.cores[0]); return TM.touchOn() ? `Drag the left side of the screen to move. Tap a skill button to cast ${s.name}; hold the big button to charge your attack.` : `${SET.control === 'wasd' ? 'Move with WASD. ' : ''}Press ${slotLabel(0)} to cast ${s.name}. Hold left-click to charge your attack.`; }
   const singles = p.cores.filter(c => c && c.type === 'el'), diff = new Set(singles.map(c => c.el)).size;
-  if (g.merges === 0 && diff >= 2) return 'You have 2 different cores: press Tab to merge them into a stronger skill.';
+  if (g.merges === 0 && diff >= 2) return 'You have 2 different cores: ' + (TM.touchOn() ? 'tap Bag' : 'press Tab') + ' to merge them into a stronger skill.';
   if (g.forge && !g.inForge && g.stageT < 14 && !g.visitedForge) return `A forge is nearby: follow the gold arrow. Inside it, enemies lose track of you, and you can spend gold (press T).`;
   if (g.inForge) g.visitedForge = true;
-  if (g.boss && g.stageT < 10) return 'Dash (Space) through shock waves — you are invincible while dashing. Control skills break its posture.';
+  if (g.boss && g.stageT < 10) return 'Dash (' + (TM.touchOn() ? 'the boot button' : 'Space') + ') through shock waves — you are invincible while dashing. Control skills break its posture.';
   if (p.cores.slice(0, BAR_SIZE).includes(null) && p.cores.slice(BAR_SIZE).some(Boolean)) return 'Your bar has an empty slot: press Tab and drag a core from your bag onto it.';
   return '';
 }
@@ -893,6 +905,7 @@ function hud(dt) {
   $('en').style.width = Math.max(0, p.energy / p.energyMax * 100) + '%'; $('ent').textContent = Math.floor(p.energy) + ' / ' + p.energyMax;
   const bsig = SET.control + p.cores.slice(0, BAR_SIZE).map(c => c ? JSON.stringify(c) : '-').join('|');
   if (qw.dataset.sig !== bsig) { qw.dataset.sig = bsig; buildBar(); }
+  TM.syncTouch(g, iconSkill);
   for (let i = 0; i < BAR_SIZE; i++) { const d = qw.children[i], c = p.cores[i]; if (d && c) { d.classList.toggle('poor', p.energy < g.coreSkill(c).cost); d.classList.toggle('forged', !!g.coreSkill(c).forged); } }
   let h = autoHint(); const H = $('hint');
   if (h && !hintState.forced) { if (hintState.gone.has(h)) h = ''; else { if (h !== hintState.cur) { hintState.cur = h; hintState.seen = 0; } hintState.seen += dt; if (hintState.seen > 8) { hintState.gone.add(h); h = ''; } } } if (H.dataset.t !== h) { H.dataset.t = h; H.innerHTML = pxText(h); } H.style.opacity = h ? 1 : 0;
@@ -985,12 +998,13 @@ function frame(now, manual) {
       if (attackT) { const d = Math.hypot(attackT.x - p.x, attackT.y - p.y) - (attackT.r || 16); it.ax = attackT.x; it.ay = attackT.y; if (d > range) { it.mx = attackT.x - p.x; it.my = attackT.y - p.y; } else autoFire = true; }
       else if (moveTo) { const d = Math.hypot(moveTo.x - p.x, moveTo.y - p.y); if (d < 8) moveTo = null; else { it.mx = moveTo.x - p.x; it.my = moveTo.y - p.y; } }
       it.fire = autoFire; it.fireHeld = mouse.down; it.fireReleased = mouse.released;
+      if (TM.touchOn()) TM.touchInput(it, game, dt);
       let steps = 0;
       while (acc >= 1 / 60 && steps < 4) {
         // phím chỉ được lấy ra khỏi hàng đợi khi thực sự có bước mô phỏng → không còn mất phím trên màn hình >60Hz
         if (steps === 0) {
           it.slots = slotQ.splice(0); it.potion = potQ; potQ = null;
-          if (dashQ) { it.dash = true; if (!(wasd && (kx || ky))) { it.mx = wm.x - p.x; it.my = wm.y - p.y; } moveTo = null; dashQ = false; }
+          if (dashQ) { it.dash = true; if (TM.touchOn()) { const d = TM.dashDir(game); it.mx = d.x; it.my = d.y; } else if (!(wasd && (kx || ky))) { it.mx = wm.x - p.x; it.my = wm.y - p.y; } moveTo = null; dashQ = false; }
         } else { it.slots = []; it.dash = false; it.fireReleased = false; it.potion = null; }
         game.step(1 / 60, it); acc -= 1 / 60; steps++;
         if (game.state === 'reward' || game.over) break;
@@ -1005,7 +1019,8 @@ function frame(now, manual) {
   if (ui === 'play') {
     if (marker) { marker.t -= dt; if (marker.follow) { marker.x = marker.follow.x; marker.y = marker.follow.y; } const [sx, sy] = R.toScreen(marker.x, marker.y), k = Math.max(0, marker.t / 0.45), Z = R.zoom; c.strokeStyle = marker.c; c.globalAlpha = k; c.lineWidth = 3; c.beginPath(); c.ellipse(sx, sy + 6 * Z, 18 * Z * (1.4 - k * 0.4), 9 * Z * (1.4 - k * 0.4), 0, 0, 7); c.stroke(); c.globalAlpha = 1; if (marker.t <= 0) marker = null; }
     if (attackT) { const [sx, sy] = R.toScreen(attackT.x, attackT.y), r = ((attackT.r || 16) + 8) * R.zoom; c.strokeStyle = '#ff5a4a'; c.lineWidth = 2; c.setLineDash([5, 4]); c.beginPath(); c.ellipse(sx, sy + r * 0.5, r * 1.3, r * 0.6, 0, 0, 7); c.stroke(); c.setLineDash([]); }
-    c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(mouse.x, mouse.y, 9, 0, 7); c.moveTo(mouse.x - 14, mouse.y); c.lineTo(mouse.x - 5, mouse.y); c.moveTo(mouse.x + 5, mouse.y); c.lineTo(mouse.x + 14, mouse.y); c.moveTo(mouse.x, mouse.y - 14); c.lineTo(mouse.x, mouse.y - 5); c.moveTo(mouse.x, mouse.y + 5); c.lineTo(mouse.x, mouse.y + 14); c.stroke();
+    TM.drawTouch(c, R, game);
+    if (!TM.touchOn()) { c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(mouse.x, mouse.y, 9, 0, 7); c.moveTo(mouse.x - 14, mouse.y); c.lineTo(mouse.x - 5, mouse.y); c.moveTo(mouse.x + 5, mouse.y); c.lineTo(mouse.x + 14, mouse.y); c.moveTo(mouse.x, mouse.y - 14); c.lineTo(mouse.x, mouse.y - 5); c.moveTo(mouse.x, mouse.y + 5); c.lineTo(mouse.x, mouse.y + 14); c.stroke(); }
   }
   if (ui !== 'title') hud(dt);
   AU.music(ui === 'title' ? 'title' : ((game.boss && !game.boss.dead) ? 'boss_' : 'map_') + (game.theme || 'forest')); AU.musicPhase(game.boss && !game.boss.dead ? game.boss.phase : 0); AU.duck(ui !== 'play' && ui !== 'title');
@@ -1020,6 +1035,9 @@ window.__ea = {
   shot: async n => fetch('/save/' + n, { method: 'POST', body: cv.toDataURL('image/png') }).then(r => r.text())
 };
 requestAnimationFrame(frame);
+TM.initMobile({ SET, game: () => game, slot: i => { if (ui === 'play' && !modals.length) slotQ.push(i); }, dash: () => { if (ui === 'play' && !modals.length) dashQ = true; }, potion: k => { if (ui === 'play' && !modals.length) potQ = k; } });
+syncControl();
+if (!document.documentElement.requestFullscreen) document.querySelectorAll('[data-act="fullscreen"]').forEach(b => b.classList.add('hidden'));   // iPhone Safari: không có API toàn màn hình
 
 // nút đóng: mọi bảng dùng nút X ở góc trên bên phải (luôn dính trên cùng khi cuộn), bỏ nút đóng ở cuối trang
 const PX_X = '<svg viewBox="0 0 7 7" width="14" height="14" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h2v1H0zM1 1h2v1H1zM2 2h3v1H2zM3 3h1v1H3zM2 4h3v1H2zM1 5h2v1H1zM0 6h2v1H0zM5 0h2v1H5zM4 1h2v1H4zM4 5h2v1H4zM5 6h2v1H5z"/></svg>';

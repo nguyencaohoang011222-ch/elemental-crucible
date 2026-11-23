@@ -71,7 +71,7 @@ function build() {
       btn('Give core', () => addCore(cores.kind, cores.a, cores.b, cores.c)), btn('Open bag', () => api.openBag())),
     sec('Upgrades', (() => { const s = sel(MINOR.map(u => [u.id, u.name]), MINOR[0].id, () => {}); return h('span', {}, s, btn('Grant', () => { const u = MINOR_BY_ID[s.value]; G().upgrades[u.id] = (G().upgrades[u.id] || 0) + 1; u.apply(G().p.mods, G()); G().upgradeLog.push(u.name); G().refreshStats(false); api.hint(u.name + ' granted'); })); })(),
       btn('+1 Fusion Shard', () => { G().p.shards = (G().p.shards || 0) + 1; }), h('label', {}, h('input', { type: 'checkbox', checked: !!g.labShards, on: { change: e => { G().labShards = e.target.checked; } } }), ' Infinite shards'),
-      btn('+100 gems', () => { api.gems(100); }), btn('Reset profile', () => { api.resetProfile(); }),
+      btn('Reset profile', () => { api.resetProfile(); }),
       btn('Drop energy', () => G().dropAt('energy', G().p.x + 60, G().p.y)), btn('Drop heal', () => G().dropAt('heal', G().p.x + 60, G().p.y)), btn('Drop stat', () => G().dropAt('stat', G().p.x + 60, G().p.y))),
     sec('Forge (smith)',
       btn('Spawn smith here', () => { const g = G(); removeForge(g); placeForge(g, FORGE_R, true); api.hint(smithOf(g.theme).name + ' set up shop nearby — walk onto the porch and press T.'); }),

@@ -17,6 +17,12 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - **Anchors:** the weapon hand sits at `HAND_Y` (−2 world px from the foot centre, exported from `gfx/skinlines.js`). Every weapon, muzzle and skin-VFX origin uses `p.y + HAND_Y`, never a hard-coded offset. The player hurtbox is `r: 12` (`sim.js`).
 - Hero Select cards show the skin's diorama (chibi on its biome pedestal), with `cursor: pointer !important`.
 
+## Controls (hybrid PC + mobile)
+
+- Three modes in `SET.control`: `wasd`, `mouse` (PC) and `touch` (mobile). The PC / Mobile button in the top-right corner (title screen `#ctlbtn`, in-run `#ctlhud`) toggles between touch and the last PC mode; touch devices start in `touch` the first time.
+- `mobile.js` only fills the per-frame input object `it` that `main.js` passes to `game.step`; never put gameplay logic there. Touch UI lives in `#touchui` and is shown by `body.touch`.
+- Every screen must fit a landscape phone (about 740×360) without scrolling: use the `@media (max-height:500px)` block at the end of the stylesheet.
+
 ## UI
 
 - **No emoji anywhere in the UI.** Use the pixel icon set (`gfx/pixelIcons.js`, `<i data-px="name">` or `PXI(name, size)`), adding a new 16×16 icon there when one is missing. The only exception is `showHint()` strings: they may contain the emoji tokens listed in `PX_EMOJI` (`main.js`), which `pxText` swaps for pixel icons before display.

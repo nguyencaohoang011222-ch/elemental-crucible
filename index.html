@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b0f0d">
 <title>Elemental Arena</title>
 <link rel="icon" type="image/png" href="icons/icon-160.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -10,6 +10,7 @@
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0a0f0d;color:var(--ink);font:14px 'Pixelify Sans',monospace;overflow:hidden;user-select:none}
 canvas{position:fixed;inset:0;width:100vw;height:100vh;image-rendering:pixelated;cursor:none}
 .hidden{display:none!important}
+
 .acct{display:flex;gap:6px;align-items:center}.acctbtn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;background:#13201bcc;border:1px solid #ffffff1c;color:#e8ece9;font:700 13px 'Pixelify Sans',monospace;cursor:pointer;clip-path:var(--px-step2)}
 .acctbtn:hover{border-color:#d4af3799;color:#fff}.acctbtn.me{color:#f2d675}.acctbtn.out{padding:0 9px}.acctbtn .pxi{image-rendering:pixelated}
 .nickin{width:100%;box-sizing:border-box;margin-top:8px;padding:10px 12px;background:#0c1210;border:2px solid #2a3a30;color:#f0e2b8;font:700 18px 'Pixelify Sans',monospace;outline:none}.nickin:focus{border-color:#d4af37}
@@ -579,6 +580,36 @@ button .pxi{margin-right:2px}
 .estat .pxi{width:28px;height:28px}
 .eup{display:inline-flex;align-items:center;gap:6px}.eup .pxi{width:14px;height:14px}
 .eup.relic{border-color:#80182499!important;color:#ffc8c0}.eup.stat{border-color:#d4af3755!important}
+/* ---------- nút chuyển PC / Mobile (góc trên phải: màn chính + trong trận) ---------- */
+.ctlbtn{display:inline-flex!important;align-items:center;gap:6px;width:auto!important;padding:0 10px;font:700 12px 'Pixelify Sans',monospace;letter-spacing:.06em;color:#f2d675!important;clip-path:var(--px-step2)}.ctlbtn .pxi{image-rendering:pixelated}
+#ctlhud{position:absolute;right:200px;top:14px;height:42px;background:var(--panel);border:1px solid var(--line);border-radius:6px;pointer-events:auto}#ctlhud:hover,.ctlbtn:hover{border-color:var(--gold)}
+body.touch #ctlhud,body.touch #audiobtn{top:calc(10px + env(safe-area-inset-top))}
+/* ---------- điều khiển cảm ứng (body.touch) ---------- */
+#touchui{display:none}body.touch #touchui{display:block}body.touch #skillbar,body.touch #potbox{display:none}
+body.touch canvas,body.touch #touchui,body.touch #touchui *{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tzone{position:absolute;left:0;top:18%;width:46%;bottom:0;pointer-events:auto}
+.tjoy{display:none;position:absolute;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;background:#0b0f0d55;box-shadow:inset 0 0 0 3px #d4af3766,inset 0 0 0 5px #0008;pointer-events:none}
+.tknob{position:absolute;left:31px;top:31px;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f2d675,#b8921f);box-shadow:0 0 0 3px #141013,0 4px 0 #0008}
+.tcluster{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));width:250px;height:230px;pointer-events:none}
+.tbtn2{position:absolute;pointer-events:auto;display:grid;place-items:center;padding:0;background:#13201bdd;color:#f0e2b8;border:0;clip-path:var(--px-step2);box-shadow:inset 0 0 0 2px #d4af3788,inset 0 2px 0 #ffffff22,inset 0 -3px 0 #0009}
+.tbtn2.on{background:#2a2412ee;box-shadow:inset 0 0 0 2px #f2d675,inset 0 -1px 0 #0009;transform:translateY(2px)}
+.tbtn2 .pxi,.tbtn2 img{image-rendering:pixelated;pointer-events:none}
+.tatk{right:0;bottom:0;width:96px;height:96px;background:#2a2412e6}
+.tsk{width:62px;height:62px}.tsk img{width:44px;height:44px}.tsk.empty{opacity:.35}.tsk.poor img{filter:grayscale(1) brightness(.6)}.tsk.cancel{box-shadow:inset 0 0 0 2px #ff6a5a}
+.tsk.s0{right:112px;bottom:0}.tsk.s1{right:104px;bottom:78px}.tsk.s2{right:52px;bottom:142px}.tsk.s3{right:-6px;bottom:166px}
+.tdash{right:184px;bottom:6px;width:56px;height:56px}.tdash.cd{opacity:.45}
+.tpot{width:42px;height:42px;font:700 11px 'Pixelify Sans',monospace}.tpot span{position:absolute;right:3px;bottom:1px}.tpot.hp{right:192px;bottom:84px;box-shadow:inset 0 0 0 2px #e0342c99}.tpot.en{right:166px;bottom:134px;box-shadow:inset 0 0 0 2px #4a8aff99}.tpot.empty{opacity:.35}
+body.touch #pausebtn,body.touch #bagbtn{top:calc(10px + env(safe-area-inset-top))}body.touch #pausebtn{right:calc(12px + env(safe-area-inset-right))}
+body.touch #hint{bottom:auto;top:64px}
+#rotate{display:none}
+@media (orientation:portrait) and (pointer:coarse){#rotate{display:grid;place-items:center;position:fixed;inset:0;z-index:9999;background:#0b0f0d;color:#f0e2b8;text-align:center}#rotate>div{display:flex;flex-direction:column;align-items:center;gap:10px;font:700 18px 'Pixelify Sans',monospace}#rotate span{font-size:13px;color:#9aa09d}}
+@media (max-height:500px){.tcluster{transform:scale(.86);transform-origin:right bottom}
+  /* màn hình thấp (điện thoại xoay ngang): bảng gọn lại, menu tạm dừng 2 cột, không cần cuộn */
+  .box{padding:12px 18px;max-height:96vh}.pausebox{width:min(560px,92vw);padding:10px 18px}.ptitle{font-size:20px;margin-bottom:8px}.pausebox .audiopanel{margin-top:8px;padding:6px 10px;gap:4px}.box h2{font-size:20px}.box .sub{margin-bottom:8px}
+  .pmenu{display:grid;grid-template-columns:1fr 1fr;gap:6px}.pbtn{height:32px;font-size:12px}
+  #title>div{padding-top:44px}#title .logo{font-size:34px;letter-spacing:4px}#title .tag{font-size:13px;margin:2px 0 12px}
+  .tmenu{display:grid;grid-template-columns:1fr 1fr;width:min(540px,90vw);gap:7px}.tmenu .tbtn{height:38px;font-size:12px;padding:0 14px}.tmenu .tbtn.hero{grid-column:1/-1}
+  .topr{top:8px;right:calc(10px + env(safe-area-inset-right))}.topr .ibtn{width:32px;height:32px}}
 </style></head><body>
 <canvas id="c"></canvas>
 
@@ -586,12 +617,22 @@ button .pxi{margin-right:2px}
   <div id="hpbox"><div class="bar"><i id="hp"></i><span id="hpt"></span></div><div class="bar en"><i id="en"></i><span id="ent"></span></div><div class="bar dash"><i id="dash"></i></div><div class="bar focus hidden" id="focusbar" title="Focus — slow motion while drawing"><i id="focus"></i></div><div id="shardbox" title="Fusion Shards — needed to merge 3 single cores into an ultimate">◆ <span id="shards">0</span> Fusion Shard</div><div id="goldbox" title="Gold — spend it at a forge"><i class="coin"></i><span id="goldv">0</span> gold</div><div id="potbox"><div class="pot hp" id="poth" title="Health Potion — restores 40% HP"><b>1</b><i></i><span id="pothn">0</span></div><div class="pot en" id="pote" title="Energy Potion — restores 60 energy"><b>2</b><i></i><span id="poten">0</span></div></div></div>
   <div id="tradep" class="hidden"><b>T</b> Trade with <span id="tradename"></span></div>
   <div id="stagebox"><b id="stage">Stage 1</b><span id="stagesub"></span></div>
-  <button id="pausebtn" title="Pause (Esc)"><i data-px="pause" data-size="16"></i></button><button id="bagbtn" title="Bag (Tab)"><i data-px="bag" data-size="16"></i> Bag</button><button id="audiobtn" title="Sound"><i data-px="sound" data-size="18"></i></button><div id="audiopop" class="audiopanel hidden"></div><div id="audiotoast"></div>
+  <button id="pausebtn" title="Pause (Esc)"><i data-px="pause" data-size="16"></i></button><button id="bagbtn" title="Bag (Tab)"><i data-px="bag" data-size="16"></i> Bag</button><button id="ctlhud" class="ctlbtn" aria-label="Switch between PC and mobile controls"></button><button id="audiobtn" title="Sound"><i data-px="sound" data-size="18"></i></button><div id="audiopop" class="audiopanel hidden"></div><div id="audiotoast"></div>
   <div id="bossbar" class="hidden"><div class="bn"><b id="bossname"></b><span id="bossep"></span></div><div class="bar boss"><i id="bosshp"></i><em class="tick" id="tick1"></em><em class="tick" id="tick2"></em></div><div class="bar poise"><i id="bosspoise"></i></div></div>
   <div id="hint"></div>
   <div id="labstrip" class="hidden"></div>
   <div id="skillbar"><div id="qwer"></div><div id="df" style="display:none"></div></div>
+  <div id="touchui">
+    <div class="tzone"></div><div class="tjoy"><div class="tknob"></div></div>
+    <div class="tcluster">
+      <button class="tbtn2 tatk" aria-label="Attack"><i data-px="swords" data-size="34"></i></button>
+      <button class="tbtn2 tsk s0" aria-label="Skill 1"></button><button class="tbtn2 tsk s1" aria-label="Skill 2"></button><button class="tbtn2 tsk s2" aria-label="Skill 3"></button><button class="tbtn2 tsk s3" aria-label="Skill 4"></button>
+      <button class="tbtn2 tdash" aria-label="Dash"><i data-px="boot" data-size="24"></i></button>
+      <button class="tbtn2 tpot hp" aria-label="Health potion"><i data-px="potion" data-size="18"></i><span>0</span></button><button class="tbtn2 tpot en" aria-label="Energy potion"><i data-px="potion" data-size="18"></i><span>0</span></button>
+    </div>
+  </div>
 </div>
+<div id="rotate"><div><i data-px="restart" data-size="40"></i><b>Rotate your phone</b><span>Elemental Arena plays in landscape.</span></div></div>
 
 <div id="title" class="screen on"><div>
   <div class="logo">ELEMENTAL ARENA</div><div class="tag">Merge the elements. Break the titans.</div>
@@ -605,8 +646,10 @@ button .pxi{margin-right:2px}
 </div>
 <div class="topr">
   <div class="acct hidden" id="acct"></div>
+  <button class="ibtn ctlbtn" id="ctlbtn" aria-label="Switch between PC and mobile controls"></button>
   <button class="ibtn" data-act="settings" data-tip="Settings" aria-label="Settings"><i data-px="gear" data-size="18"></i></button>
   <button class="ibtn" data-act="controls" data-tip="How to Play" aria-label="How to Play"><i data-px="book" data-size="18"></i></button>
+  <button class="ibtn" data-act="fullscreen" data-tip="Fullscreen" aria-label="Fullscreen"><i data-px="expand" data-size="18"></i></button>
   <div class="gempill" id="titlegems"></div>
 </div>
 <div class="ver">v0.1</div></div>
@@ -615,7 +658,7 @@ button .pxi{margin-right:2px}
   <div class="steps"><span id="st1" class="on">1 · Hero</span><span id="st2">2 · First element</span></div>
   <div id="nr1"><h2 class="nrtitle">Choose Your Hero</h2><div class="hcards" id="heroes"></div></div>
   <div id="nr2" class="hidden"><h2 class="nrtitle">Choose Your First Element</h2><div class="ecards" id="elements"></div>
-    <div class="ctlbar"><div class="ctlgrp"><span class="ctllab"><i data-px="keyboard" data-size="14"></i>Movement</span><span class="seg ctlseg"><button data-c="wasd">WASD + Mouse</button><button data-c="mouse">Right-Click</button></span></div><div class="ctlgrp"><span class="ctllab"><i data-px="mouse" data-size="14"></i>Difficulty</span><span class="seg" id="diffseg"><button data-d="NORMAL" class="on">Normal</button><button data-d="HARD">Hard</button></span></div></div></div>
+    <div class="ctlbar"><div class="ctlgrp"><span class="ctllab"><i data-px="keyboard" data-size="14"></i>Movement</span><span class="seg ctlseg"><button data-c="wasd">WASD + Mouse</button><button data-c="mouse">Right-Click</button><button data-c="touch">Touch</button></span></div><div class="ctlgrp"><span class="ctllab"><i data-px="mouse" data-size="14"></i>Difficulty</span><span class="seg" id="diffseg"><button data-d="NORMAL" class="on">Normal</button><button data-d="HARD">Hard</button></span></div></div></div>
   <div class="row"><button class="btn" id="nrback">Back</button><button class="btn go" id="nrnext">Next</button></div>
 </div></div>
 
@@ -635,7 +678,7 @@ button .pxi{margin-right:2px}
   <h2>Settings</h2><p class="sub">Saved on this device.</p>
   <div class="setrow"><label for="s-master">Master volume</label><input type="range" id="s-master" min="0" max="100"></div>
   <div class="setrow"><label for="s-sfx">Effects volume</label><input type="range" id="s-sfx" min="0" max="100"></div>
-  <div class="setrow"><label>Movement</label><span class="seg ctlseg"><button data-c="wasd">WASD + mouse aim</button><button data-c="mouse">Right-click to move</button></span></div>
+  <div class="setrow"><label>Movement</label><span class="seg ctlseg"><button data-c="wasd">WASD + mouse aim</button><button data-c="mouse">Right-click to move</button><button data-c="touch">Touch</button></span></div>
   <div class="setrow"><label for="s-musicon">Music on</label><input type="checkbox" id="s-musicon"></div>
   <div class="setrow"><label for="s-sfxon">Sound effects on</label><input type="checkbox" id="s-sfxon"></div>
   <div class="setrow"><label for="s-music">Music volume</label><input type="range" id="s-music" min="0" max="100"></div>
@@ -684,7 +727,7 @@ button .pxi{margin-right:2px}
   <div class="invlabel">Bag</div><div class="invrow" id="invbag"></div>
   <div class="invlabel hidden" id="catlabel">Test Lab — every skill: drag one onto a skill-bar slot to replace it (or click to put it in the first empty slot)</div><div class="invrow hidden" id="invcat" style="max-height:230px;overflow:auto"></div>
   <div class="mtable"><div class="invlabel" style="margin-top:0">Merge table</div><div class="prev" id="mprev"></div></div>
-  <div class="row"><button class="btn" id="mclear">Clear</button><button class="btn" id="mrev">⇄ Reverse order</button><button class="btn go" id="mok" disabled>Merge</button><button class="btn" id="bagclose">Close (Tab)</button></div>
+  <div class="row"><button class="btn" id="mclear">Clear</button><button class="btn" id="mrev">⇄ Reverse order</button><button class="btn" id="mswap" disabled>Swap</button><button class="btn go" id="mok" disabled>Merge</button><button class="btn" id="bagclose">Close (Tab)</button></div>
 </div><div class="bagright" id="bagbuild"></div></div>
 </div></div>
 
