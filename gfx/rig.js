@@ -87,6 +87,12 @@ export const CHIBI_DROP = 3;
 export function chibiGrid(g) {
   const W = g.w, cut = 17 + HERO_MY, d = g.d.slice();
   for (let y = cut; y >= 0; y--) for (let x = 0; x < W; x++) d[y * W + x] = y - CHIBI_DROP >= 0 ? g.d[(y - CHIBI_DROP) * W + x] : null;
+  // vá đường nối eo: khi thân trên nhún lên 1px (by = -1) còn vạt dưới đứng yên, hàng nối bị trống và viền đen chạy ngang bụng.
+  // lấp hàng trống bằng màu vải ngay bên dưới để thân trên và vạt áo luôn liền một khối.
+  for (let y = cut - 2; y <= cut + 1; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x; if (d[i]) continue;
+    const up = d[i - W], dn = d[i + W]; if (up && dn) d[i] = dn;
+  }
   g.d = d; return g;
 }
 function drawHero(cls, P) { return chibiGrid(heroGrid(cls, P)).canvas('#141013'); }
