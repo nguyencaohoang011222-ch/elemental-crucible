@@ -580,6 +580,8 @@ button .pxi{margin-right:2px}
 .estat .pxi{width:28px;height:28px}
 .eup{display:inline-flex;align-items:center;gap:6px}.eup .pxi{width:14px;height:14px}
 .eup.relic{border-color:#80182499!important;color:#ffc8c0}.eup.stat{border-color:#d4af3755!important}
+/* trailer: ẩn con trỏ, chỉ còn canvas */
+body.trailer canvas{cursor:none!important}body.trailer #hud,body.trailer .topr{display:none!important}
 /* ---------- nút chuyển PC / Mobile (góc trên phải: màn chính + trong trận) ---------- */
 .ctlbtn{display:inline-flex!important;align-items:center;gap:6px;width:auto!important;padding:0 10px;font:700 12px 'Pixelify Sans',monospace;letter-spacing:.06em;color:#f2d675!important;clip-path:var(--px-step2)}.ctlbtn .pxi{image-rendering:pixelated}
 #ctlhud{position:absolute;right:200px;top:14px;height:42px;background:var(--panel);border:1px solid var(--line);border-radius:6px;pointer-events:auto}#ctlhud:hover,.ctlbtn:hover{border-color:var(--gold)}
@@ -652,7 +654,7 @@ body.touch #hint{bottom:auto;top:64px}
   <button class="ibtn" data-act="fullscreen" data-tip="Fullscreen" aria-label="Fullscreen"><i data-px="expand" data-size="18"></i></button>
   <div class="gempill" id="titlegems"></div>
 </div>
-<div class="ver">v0.1</div></div>
+<div class="ver">v0.1 · T: trailer</div></div>
 
 <div id="newrun" class="screen modal"><div class="box nrbox">
   <div class="steps"><span id="st1" class="on">1 · Hero</span><span id="st2">2 · First element</span></div>
@@ -685,6 +687,7 @@ body.touch #hint{bottom:auto;top:64px}
   <div class="setrow"><label for="s-shake">Screen shake</label><input type="checkbox" id="s-shake"></div>
   <div class="setrow"><label for="s-numbers">Damage numbers</label><input type="checkbox" id="s-numbers"></div>
   <div class="setrow"><label for="s-hints">Tutorial hints</label><input type="checkbox" id="s-hints"></div>
+  <div class="setrow"><label>Graphics quality</label><span class="seg" id="gfxseg"><button data-q="auto">Auto</button><button data-q="high">High</button><button data-q="low">Low</button></span></div>
   <div class="setrow"><label for="s-light">Dynamic lighting (turn off on slow machines)</label><input type="checkbox" id="s-light"></div>
   <div class="setrow"><label for="s-fps">Show FPS (F3)</label><input type="checkbox" id="s-fps"></div>
   <div class="setrow"><label for="s-autopause">Pause when the window loses focus</label><input type="checkbox" id="s-autopause"></div>

@@ -645,8 +645,8 @@ export class Game extends Sim {
       for (const z of this.zones) if (z.kind === 'barrier' && dist(f.x, f.y, z.follow ? p.x : z.x, z.follow ? p.y : z.y) < z.r + f.r) { f.life = 0; this.emit('block', { x: f.x, y: f.y }); }
       if (f.life <= 0) continue;
       if (f.trail && this.surface && this.rand() < 0.5) this.surface.apply(f.x, f.y, 22, f.trail, { rand: this.rand, life: 6 });
+      if (this.parryShot(f)) continue;   // nhát chém đỡ trước khi đạn chạm người
       if (p.inv <= 0 && !p.leap && !(f.pierce && f.hitP) && dist(f.x, f.y, p.x, p.y) < f.r + p.r) { f.hitP = true; this.hurtPlayer(f.dmg, Math.atan2(f.vy, f.vx), { boss: f.boss }); if (!f.pierce) { f.life = 0; continue; } }
-      if (p.cls === 'KNIGHT' && p.swing > 0.06 && dist(f.x, f.y, p.x, p.y) < 70 && Math.abs(angDiff(Math.atan2(f.y - p.y, f.x - p.x), p.aim)) < 0.9) { f.life = 0; this.emit('parry', { x: f.x, y: f.y }); if (p.mods.riposte) this.reflectShot(f); }
     }
     for (const f of this.foes) if (f.life <= 0 && !f.landed) { f.landed = true; foeLand(this, f); }
     this.foes = this.foes.filter(f => f.life > 0);

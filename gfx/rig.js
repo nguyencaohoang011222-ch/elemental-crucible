@@ -386,7 +386,7 @@ export class Rig {
     const key = kind + id + JSON.stringify(P); let f = this.cache.get(key);
     if (f) return f;
     const img = kind === 'h' ? drawHero(id, P) : kind === 'e' ? ENEMY_DRAW[id](P) : BOSS_DRAW[id][0](P);
-    f = { img, white: whiteOf(img), red: tintOf(img, '#ff2a2a') }; this.cache.set(key, f);
+    f = { img, _w: null, _r: null, get white() { return this._w || (this._w = whiteOf(this.img)); }, get red() { return this._r || (this._r = tintOf(this.img, '#ff2a2a')); } }; this.cache.set(key, f);   // trắng/đỏ dựng lười: phần lớn khung không bao giờ bị đánh trúng
     if (this.cache.size > 900) this.cache.delete(this.cache.keys().next().value);
     return f;
   }

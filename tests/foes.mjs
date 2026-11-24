@@ -99,7 +99,7 @@ const evs = g => g.events.map(e => e.ev);
   ok(front < back * 0.3, `Glacial Sentinel's frost shield blocks frontal projectiles (${front | 0} front vs ${back | 0} flank)`);
   ok(e.blockT > 0, 'blocking a frontal hit lights up the shield runes');
   g.labFreezeAI = false; let beam = false, cone = 0, spikes = false; run(g, 12, g => { if (g.hazards.some(h => h.kind === 'beam' && h.owner === e && h.spin)) beam = true; cone = Math.max(cone, g.hazards.filter(h => h.kind === 'line' && h.sty === 'ice' && !h.done).length); if (evs(g).includes('iceSpikes')) spikes = true; });
-  ok(cone === 5 && spikes, 'Glacial Sentinel slams its shield into a cone of 5 jagged ice-spike lanes');
+  ok(cone === 3 && spikes, 'Glacial Sentinel slams its shield into a cone of 3 jagged ice-spike lanes');
   ok(beam, 'Glacial Sentinel also fires a sweeping freezing beam');
 }
 // Cinder Imp: nổ trễ 0.6s sau khi chết

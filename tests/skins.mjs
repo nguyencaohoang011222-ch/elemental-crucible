@@ -76,7 +76,7 @@ PR.reset();
   const hiThemes = new Set(); for (const cls of ['KNIGHT', 'RANGER', 'MAGE']) for (const s of PR.SKINS[cls]) if (['epic', 'victory', 'heroes', 'boss'].includes(s.tier)) hiThemes.add(s.theme);
   ok([...hiThemes].every(t => LINES[t]), 'every Epic / Victory / HEROES / Boss skin line has its own VFX module (' + hiThemes.size + ' lines)');
   const shape = (theme, cls) => {
-    const cells = new Set(), ctx = { fillStyle: '', strokeStyle: '', globalAlpha: 1, lineWidth: 1, fillRect(x, y) { cells.add(Math.round(x / 3) + ',' + Math.round(y / 3)); }, beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, fill() {}, stroke() {}, save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, closePath() {} };
+    const cells = new Set(), ctx = { fillStyle: '', strokeStyle: '', globalAlpha: 1, lineWidth: 1, fillRect(x, y) { cells.add(Math.round(x / 3) + ',' + Math.round(y / 3)); }, rect(x, y) { cells.add(Math.round(x / 3) + ',' + Math.round(y / 3)); }, beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, fill() {}, stroke() {}, save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, closePath() {} };
     const sim = { p: { x: 0, y: 0, aim: 0, face: 1, cls, dashX: 1, dashY: 0, vx: 200, vy: 0, charge: 0.8, skinFx: { tier: 'boss', theme } }, enemies: [], ults: [] }, R = { parts: [], time: 0, addShake() {}, gapMark() {} }, L = LINES[theme];
     const evs = [{ ev: 'dash', x: 0, y: 0 }, cls === 'KNIGHT' ? { ev: 'swing', x: 0, y: 0, a: 0, reach: 104, arc: 1.4, combo: 1 } : { ev: 'shoot', x: 0, y: 0, a: 0, kind: cls === 'MAGE' ? 'orb' : 'arrow' }, { ev: 'slam', x: 120, y: 0, r: 70, el: 'FIRE' }];
     for (const [i, e] of evs.entries()) lineEvent(L, R, e, i === 0 ? 'move' : i === 1 ? 'basic' : 'single', cls, sim);

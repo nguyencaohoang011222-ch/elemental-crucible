@@ -36,6 +36,7 @@ export const MINOR = [
   { id: 'swordwave', name: 'Sword Wave', cls: 'KNIGHT', max: 2, color: '#ffe9a0', text: 'Charged slashes launch a piercing crescent. Full charge (or level 2) fires three.', apply: m => { m.swordWave++; } },
   { id: 'rhythm', name: 'Battle Rhythm', cls: 'KNIGHT', max: 2, color: '#ffe9a0', text: 'A basic swing that connects pre-loads your next charge (25%, level 2: 40%). Charge 15% faster.', apply: m => { m.rhythm = m.rhythm ? 0.4 : 0.25; m.chargeSpd *= 1.15; } },
   { id: 'gapcloser', name: 'Gap Closer', cls: 'KNIGHT', max: 1, color: '#ffe9a0', text: 'Charged swings lunge at the nearest foe in front of you (up to 180px) before striking.', apply: m => { m.gapCloser = 1; } },
+  { id: 'deflect', name: 'Reflecting Edge', cls: 'KNIGHT', max: 2, color: '#ffe9a0', text: 'Your swings bounce enemy projectiles back at their shooter (100% damage, level 2: 160%) and parry in a wider, longer arc.', apply: m => { m.deflect = (m.deflect || 0) + 1; } },
   { id: 'quakewave', name: 'Shockwave Mastery', cls: 'KNIGHT', max: 1, color: '#ffe9a0', text: 'A full charge also sends a ground wave 360px ahead that pierces everything (60% of the swing).', apply: m => { m.quakeWave = 1; } },
   { id: 'echo2', name: 'Cleave Echo', cls: 'KNIGHT', max: 1, color: '#ffe9a0', text: 'The 3rd hit of your combo strikes again a moment later.', apply: m => { m.cleaveEcho = 1; } },
   { id: 'multishot', name: 'Multishot', cls: 'RANGER', max: 3, color: '#7fd18b', text: 'Fire +1 extra arrow with every shot, in a fan.', apply: m => { m.atkExtra++; } },

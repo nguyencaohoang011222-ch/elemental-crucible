@@ -3,6 +3,14 @@
 // lên màn hình → chữ (số sát thương, tên chiêu) vẽ sắc nét ở độ phân giải màn hình.
 import { TILE, CHUNK, CLASSES, ENEMIES, hash2 } from './sim.js';
 import { WPP, sn, canvas, fromRows, whiteOf } from './gfx/pixel.js';
+// bóng elip dựng sẵn (theo bán kính làm tròn): drawImage rẻ hơn nhiều so với beginPath/ellipse/fill cho hàng trăm vật mỗi khung
+const SHADOWS = new Map();
+function shadow(ctx, x, y, rx, ry, a) {
+  rx = Math.max(WPP, Math.round(rx / WPP) * WPP); ry = Math.max(WPP, Math.round(ry / WPP) * WPP);
+  const key = rx * 4096 + ry * 4 + (a * 100 | 0) * 16777216; let c = SHADOWS.get(key);
+  if (!c) { const w = rx * 2 / WPP + 2, h = ry * 2 / WPP + 2; c = canvas(w, h); const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,' + a + ')'; g.beginPath(); g.ellipse(w / 2, h / 2, rx / WPP, ry / WPP, 0, 0, 7); g.fill(); SHADOWS.set(key, c); }
+  ctx.drawImage(c, x - c.width * WPP / 2, y - c.height * WPP / 2, c.width * WPP, c.height * WPP);
+}
 import { THEMES, themeOf } from './gfx/themes.js';
 import { Ground } from './gfx/ground.js';
 import { Props } from './gfx/props.js';
@@ -68,12 +76,12 @@ const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${
 
 export class Renderer {
   constructor(cv) {
-    this.cv = cv; this.ctx = cv.getContext('2d'); this.ctx.imageSmoothingEnabled = false;
+    this.cv = cv; this.ctx = cv.getContext('2d', { alpha: false });   // canvas luôn phủ kín, không cần kênh trong suốt → ghép hình rẻ hơn this.ctx.imageSmoothingEnabled = false;
     this.spr = {}; this.white = {}; this.bossS = {};
     // sprite gốc 1:1 pixel (12x12 + viền), vẽ ra 42 đơn vị = 14 pixel khung
     for (const k of Object.keys(SPR)) { this.spr[k] = fromRows(SPR[k], PAL[k]); this.white[k] = whiteOf(this.spr[k]); }
     for (const d of BOSS_DEFS) { this.bossS[d.id] = WPP * Math.max(1, Math.round(d.r * 2.6 / 16 / WPP)); this.spr[d.id] = fromRows(TITAN, BOSS_PAL[d.id] || BOSS_PAL.COLOSSUS); this.white[d.id] = whiteOf(this.spr[d.id]); }
-    this.buf = canvas(64, 64); this.bctx = this.buf.getContext('2d');
+    this.buf = canvas(64, 64); this.bctx = this.buf.getContext('2d', { alpha: false });
     this.groundC = new Ground(); this.props = new Props(); this.light = new Lighting(); this.amb = new Ambient();
     this.rig = new Rig(); this.onStep = null; this.swT = 0.16; this.lastSwing = 0;
     this.texts = []; this.fps = 60; this.ms = 0; this.stepT = 0; this.P = 3;
@@ -81,8 +89,9 @@ export class Renderer {
     this.reset();
     this.resize(cv.width, cv.height);
   }
-  toScreen(x, y) { return [(x - this.camX) * this.zoom + this.W / 2, (y - this.camY) * this.zoom + this.H / 2]; }
-  toWorld(sx, sy) { return [(sx - this.W / 2) / this.zoom + this.camX, (sy - this.H / 2) / this.zoom + this.camY]; }
+  // camZoom: hệ số zoom camera (trailer: 0.85 → 1.4); camTarget: điểm camera bám thay cho người chơi (lia sang boss)
+  toScreen(x, y) { const z = this.zoom * (this.camZoom || 1); return [(x - this.camX) * z + this.W / 2, (y - this.camY) * z + this.H / 2]; }
+  toWorld(sx, sy) { const z = this.zoom * (this.camZoom || 1); return [(sx - this.W / 2) / z + this.camX, (sy - this.H / 2) / z + this.camY]; }
   reset() { this.fadeHold = false; this.fadeIn = 0; this.flashW = 0; this.bolts = []; this.lavaPts = []; this.streaks = []; this.stars = []; this.circles = []; this.claws = []; this.cracks = []; this.fallen = []; this.lobs = []; this.camX = 0; this.camY = 0; this.shake = 0; this.parts = []; this.nums = []; this.rings = []; this.slashes = []; this.decals = []; this.beams = []; this.spikes = []; this.castText = null; this.flash = 0; this.time = 0; this.banner = null;
     this.skl = []; this.skdec = []; this.skx = []; this.skrib = []; this.skp = []; this.skg = []; this.skgh = []; this.skfoot = []; this._skUlt = null; this._skKick = null; }   // hiệu ứng skin không sót sang trận/xem trước mới
   // mỗi pixel khung = P điểm màn hình (số nguyên), khung cao khoảng 225 pixel
@@ -256,9 +265,10 @@ export class Renderer {
     const t0 = performance.now(), dt = ui.dt, p = sim.p, W = this.W, H = this.H; this.time += dt; this.dtNow = dt;
     this.consume(sim, ui.sfx);
     const lx = Math.cos(p.aim) * Math.min(90, (ui.aimDist || 0) * 0.18), ly = Math.sin(p.aim) * Math.min(70, (ui.aimDist || 0) * 0.18);
-    const k = 1 - Math.exp(-10 * dt), lead = (this.camLeadK || 0) * W / this.zoom; this.camX += (p.x + lx + lead - this.camX) * k; this.camY += (p.y + ly - this.camY) * k;
+    const ct = this.camTarget, k = 1 - Math.exp(-(ct && ct.k || 10) * dt), lead = (this.camLeadK || 0) * W / this.zoom, tx = ct ? ct.x : p.x + lx + lead, ty = ct ? ct.y : p.y + ly; this.camX += (tx - this.camX) * k; this.camY += (ty - this.camY) * k;
     const sh = this.opts.shake ? this.shake : 0; this.shake = Math.max(0, this.shake - dt * 40);
-    const z = this.zoom, vw = W / z, vh = H / z;
+    const cz = this.camZoom || 1, z = this.zoom * cz, vw = W / z, vh = H / z;
+    if (cz !== 1 || this._czBuf) { const bw = Math.ceil(W / (this.P * cz)) + 3, bh = Math.ceil(H / (this.P * cz)) + 3; if (bw > this.buf.width || bh > this.buf.height) { this.buf.width = Math.max(bw, this.buf.width); this.buf.height = Math.max(bh, this.buf.height); this.bctx.imageSmoothingEnabled = false; } this.bw = bw; this.bh = bh; this._czBuf = cz !== 1; }   // zoom ra: khung pixel lớn hơn (chỉ cấp phát thêm khi cần)
     const ox = Math.floor((this.camX - vw / 2) / WPP) * WPP - WPP, oy = Math.floor((this.camY - vh / 2) / WPP) * WPP - WPP;
     const view = this.view = { ox, oy, w: this.bw * WPP, h: this.bh * WPP };
     const tk = this.themeOverride || themeOf(sim), T = THEMES[tk]; this.tk = tk; this.T = T;
@@ -274,21 +284,24 @@ export class Renderer {
     for (const [lx2, ly2] of this.lavaPts) { const hh = hash2(lx2 | 0, ly2 | 0, 3), b = (this.time * 0.9 + hh * 7) % 1; if (b < 0.25) { ctx.fillStyle = b < 0.12 ? '#ffe27a' : '#ff8a2a'; ctx.fillRect(sn(lx2 - 12 + hh * 24), sn(ly2 - 9 + hh * 12) - sn(b * 30), 6, 6); } if (hh < 0.35) lights.push({ x: lx2, y: ly2, r: 70, i: 0.65, c: '#ff5a1a', glow: 0.12 }); }
     this.under(ctx, sim, false);
     // vật thể + nhân vật + cỏ theo trục y
-    const list = [], RR = Math.max(view.w, view.h) / 2 + 160;
+    const list = this._ys || (this._ys = []), RR = Math.max(view.w, view.h) / 2 + 160; list.length = 0;
     sim.world.near(this.camX, this.camY, RR, o => {
       if (o.hidden) return;
       const spr = this.props.get(tk, T, o);
       if (o.fuse > 0) lights.push({ x: o.x, y: o.y - o.r, r: 90, i: 0.9, c: '#ff5a1a', glow: 0.25 });
       if (o.burning > 0) lights.push({ x: o.x, y: o.y - o.r, r: 110, i: 0.9, c: '#ff7a3c', glow: 0.22 });
       if (spr.glow) lights.push({ x: o.x, y: o.y + spr.glow.dy * WPP, r: spr.glow.r, c: spr.glow.c, i: 0.9 + Math.sin(this.time * 9 + o.x) * 0.08, glow: 0.2 });
-      list.push({ y: o.y, f: () => this.obstacle(ctx, o, spr) });
+      list.push({ y: o.y, k: 0, o, s: spr });
     });
     if (sim.forge) this.forgeWorld(ctx, sim, list, lights);
     if (sim.portal) this.gateWorld(ctx, sim, list, lights);
-    for (const e of sim.enemies) if (!e.boss && !e.cloneOf) list.push({ y: e.y, f: () => this.enemy(ctx, e, sim) });
-    list.push({ y: p.y, f: () => this.player(ctx, sim) });
-    for (const tu of tufts) list.push({ y: tu.y, f: () => this.tuft(ctx, tu, sim, tk, T) });
-    list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+    // lưới thô của quái (ô 64): cỏ chỉ hỏi quái ở 3×3 ô quanh nó thay vì duyệt cả đàn → hết O(cỏ × quái)
+    const EG = this._eg || (this._eg = new Map()); EG.clear();
+    for (const e of sim.enemies) { if (!e.boss && !e.cloneOf) list.push({ y: e.y, k: 1, o: e }); const kx = Math.floor(e.x / 64), ky = Math.floor(e.y / 64), key = kx * 100003 + ky; let b = EG.get(key); if (!b) EG.set(key, b = []); b.push(e); }
+    list.push({ y: p.y, k: 2, o: p });
+    if (!this.lowQ) for (const tu of tufts) list.push({ y: tu.y, k: 3, o: tu }); else for (const tu of tufts) list.push({ y: tu.y, k: 4, o: tu });
+    list.sort((a, b) => a.y - b.y);
+    for (const it of list) { switch (it.k) { case 0: this.obstacle(ctx, it.o, it.s); break; case 1: this.enemy(ctx, it.o, sim); break; case 2: this.player(ctx, sim); break; case 3: this.tuft(ctx, it.o, sim, tk, T); break; case 4: this.tuftStill(ctx, it.o, tk, T); break; default: it.f(); } }
     for (const f of this.fallen) {
       f.t -= dt; const kk = 1 - f.t / f.T;
       ctx.save(); ctx.globalAlpha = Math.min(1, f.t / 0.4); ctx.translate(sn(f.x), sn(f.y));
@@ -298,8 +311,8 @@ export class Renderer {
     }
     this.fallen = this.fallen.filter(f => f.t > 0);
     // hạt trôi + ánh sáng
-    this.amb.update(dt, this.time, T.motes); this.amb.draw(ctx, view, this.time, lights);
-    if (this.opts.light) { this.collectLights(sim, lights); this.light.render(ctx, view, T.dark, T.amb + (sim.boss ? 0.03 : 0), lights); }
+    if (!this.lowQ) { this.amb.update(dt, this.time, T.motes); this.amb.draw(ctx, view, this.time, lights); }
+    if (this.opts.light) { this.collectLights(sim, lights); if (this.lowQ && lights.length > 24) lights.length = 24; this.light.render(ctx, view, T.dark, T.amb + (sim.boss ? 0.03 : 0), lights, this.lowQ); }
     // phần phát sáng / cảnh báo: luôn rõ, không bị tối
     if (sim.arena) this.arena(ctx, sim);
     this.under(ctx, sim, true);
@@ -357,8 +370,11 @@ export class Renderer {
     for (const r of this.rings) { r.t -= dt; const pr = 1 - r.t / r.T; ctx.strokeStyle = r.c; ctx.globalAlpha = Math.max(0, r.t / r.T); ctx.lineWidth = Math.max(3, r.w || 4); ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(0, r.r + (r.R - r.r) * pr), 0, 7); ctx.stroke(); }
     ctx.globalAlpha = 1; this.rings = this.rings.filter(r => r.t > 0);
     if (p.shield > 0) { ctx.strokeStyle = '#e6d29a'; ctx.lineWidth = 3; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(this.time * 8); ctx.beginPath(); ctx.arc(p.x, p.y - 8, 26, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
-    for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.9; q.vy *= 0.9; if (q.g) q.vy += q.g * dt; ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.fillStyle = q.c; const ss = Math.max(WPP, sn(q.s)); ctx.fillRect(sn(q.x - q.s / 2), sn(q.y - q.s / 2), ss, ss); }
-    ctx.globalAlpha = 1; this.parts = this.parts.filter(q => q.life > 0).slice(-900);
+    // hạt: gom theo (màu, độ mờ làm tròn 1/8) rồi tô mỗi nhóm một lần thay cho một fillRect mỗi hạt
+    { const PG = this._pg || (this._pg = new Map()); for (const g of PG.values()) g.n = 0;
+      for (const q of this.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.9; q.vy *= 0.9; if (q.g) q.vy += q.g * dt; const a = Math.ceil(Math.max(0, q.life / q.max) * 8); if (!a) continue; const k = q.c + a; let g = PG.get(k); if (!g) PG.set(k, g = { c: q.c, a: a / 8, r: [], n: 0 }); const ss = Math.max(WPP, sn(q.s)), i = g.n * 3; g.r[i] = sn(q.x - q.s / 2); g.r[i + 1] = sn(q.y - q.s / 2); g.r[i + 2] = ss; g.n++; }
+      for (const [k, g] of PG) { if (!g.n) { if (PG.size > 64) PG.delete(k); continue; } ctx.globalAlpha = g.a; ctx.fillStyle = g.c; ctx.beginPath(); for (let i = 0; i < g.n * 3; i += 3) ctx.rect(g.r[i], g.r[i + 1], g.r[i + 2], g.r[i + 2]); ctx.fill(); } }
+    ctx.globalAlpha = 1; this.parts = this.parts.filter(q => q.life > 0); if (this.parts.length > (this.lowQ ? 260 : 900)) this.parts = this.parts.slice(this.lowQ ? -260 : -900);
     for (const q of this.streaks) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.86; q.vy *= 0.86; ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.strokeStyle = q.c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * 0.03, q.y - q.vy * 0.03); ctx.stroke(); }
     ctx.globalAlpha = 1; this.streaks = this.streaks.filter(q => q.life > 0);
     for (const b of this.bolts) { b.t -= dt; const k2 = b.t / b.T; ctx.globalAlpha = Math.min(1, k2 * 2); for (const [w2, c2] of [[7, 'rgba(120,200,255,.55)'], [3, '#ffffff']]) { ctx.strokeStyle = c2; ctx.lineWidth = w2; ctx.beginPath(); b.segs.forEach(([x2, y2], i) => i ? ctx.lineTo(x2, y2) : ctx.moveTo(x2, y2)); ctx.stroke(); } }
@@ -384,7 +400,7 @@ export class Renderer {
     S.fillStyle = '#000'; S.fillRect(0, 0, W, H);
     const kk = this._skKick, kf = kk ? Math.sin((1 - kk.t / kk.T) * Math.PI) * (1 - kk.t / kk.T) * z : 0;   // giật màn hình có hướng (rồng đập xuống)
     const sx0 = (ox - (this.camX - vw / 2)) * z + (Math.random() - 0.5) * sh * 1.2 + (kk ? kk.x * kf : 0), sy0 = (oy - (this.camY - vh / 2)) * z + (Math.random() - 0.5) * sh * 1.2 + (kk ? kk.y * kf : 0);
-    S.drawImage(this.buf, 0, 0, this.bw, this.bh, Math.round(sx0), Math.round(sy0), this.bw * this.P, this.bh * this.P);
+    S.drawImage(this.buf, 0, 0, this.bw, this.bh, Math.round(sx0), Math.round(sy0), this.bw * this.P * cz, this.bh * this.P * cz);
     this.screenTexts(S, sim, dt);
     this.overlay(S, sim, dt);
     this.ms = this.ms * 0.9 + (performance.now() - t0) * 0.1; if (dt > 0) this.fps = this.fps * 0.94 + (1 / dt) * 0.06;
@@ -428,10 +444,14 @@ export class Renderer {
   tuft(ctx, tu, sim, tk, T) {
     let sway = Math.sin(this.time * 1.7 + tu.ph + tu.x * 0.01) * 1.1;
     const push = e => { const d = Math.hypot(tu.x - e.x, tu.y - e.y); if (d < 42) sway += Math.sign(tu.x - e.x || 1) * (1 - d / 42) * 4; };
-    push(sim.p); for (const e of sim.enemies) if (Math.abs(e.x - tu.x) < 60 && Math.abs(e.y - tu.y) < 60) push(e);
+    push(sim.p); const EG = this._eg, kx = Math.floor(tu.x / 64), ky = Math.floor(tu.y / 64);
+    if (EG && EG.size) for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const b = EG.get((kx + i) * 100003 + ky + j); if (b) for (const e of b) push(e); }
     const lean = Math.max(-3, Math.min(3, Math.round(sway))), img = this.props.tuft(tk, T, tu.s, tu.c, lean);
     ctx.drawImage(img, sn(tu.x) - 7 * WPP, sn(tu.y) - 8 * WPP, img.width * WPP, img.height * WPP);
   }
+
+  // chế độ đồ hoạ thấp: cỏ đứng yên (không tính gió / bị giẫm)
+  tuftStill(ctx, tu, tk, T) { const img = this.props.tuft(tk, T, tu.s, tu.c, 0); ctx.drawImage(img, sn(tu.x) - 7 * WPP, sn(tu.y) - 8 * WPP, img.width * WPP, img.height * WPP); }
 
   overlay(ctx, sim, dt) {
     const W = this.W, H = this.H, p = sim.p;
@@ -617,7 +637,7 @@ export class Renderer {
   obstacle(ctx, o, spr) {
     const s = spr || this.props.get(this.tk, this.T, o); let x = sn(o.x); const y = sn(o.y), hit = o.hit > 0;
     if (hit) { o.hit -= this.dtNow || 0.016; x += (Math.random() < 0.5 ? -1 : 1) * WPP; }
-    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x, y, Math.max(9, o.r * 1.05), Math.max(4, o.r * 0.4), 0, 0, 7); ctx.fill();
+    shadow(ctx, x, y, Math.max(9, o.r * 1.05), Math.max(4, o.r * 0.4), 0.28);
     const w = s.img.width * WPP, h = s.img.height * WPP, X = x - s.ax * WPP, Y = y - s.ay * WPP;
     let ky = 1; if (o.sink > 0) ky = Math.max(0, o.sink / (o.sinkT || 0.8)); else if (o.rise) { const el = o.riseDelay !== undefined ? (o.age || 0) - o.riseDelay : o.T - o.life, k = Math.max(0, Math.min(1, el / o.rise)); ky = 1 - Math.pow(1 - k, 3); if (k <= 0) return; if (!o.dusted) { if (o.arena && !o.supply && Math.random() < 0.5) this.addShake(1.5); o.dusted = true; this.puff(o.x, o.y, 4, 26, (this.T && this.T.dust) || '#9a8466'); for (let i = 0; i < 4; i++) this.parts.push({ x: o.x + (Math.random() - 0.5) * o.r, y: o.y, vx: (Math.random() - 0.5) * 150, vy: -90 - Math.random() * 90, life: 0.45, max: 0.45, c: i % 2 ? '#7a644a' : '#a8906e', s: 4 }); } }
     ctx.drawImage(s.img, X, y - s.ay * WPP * ky, w, h * ky);
@@ -718,7 +738,7 @@ export class Renderer {
       if (Math.random() < 0.4 && sim.boss) this.parts.push({ x: e.x + (Math.random() - 0.5) * e.r * 2, y: e.y - Math.random() * e.r * 2, vx: 0, vy: -40, life: 0.8, max: 0.8, c: sim.boss.def.accent, s: 3 });
       return; }
     const d = ENEMIES[e.type], t = this.time, sc = 1;
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(sn(e.x), sn(e.y + 9), d.r, d.r * 0.38, 0, 0, 7); ctx.fill();
+    shadow(ctx, sn(e.x), sn(e.y + 9), d.r, d.r * 0.38, 0.3);
     const face = sim.p.x < e.x ? -1 : 1, near = (ENEMIES[e.type] || {}).ai === 'melee' && Math.hypot(sim.p.x - e.x, sim.p.y - e.y) < 48;
     const fr = this.rig.frame('e', e.type, enemyPose(e, t, near)), [w, h] = ENEMY_SIZE[e.type];
     if (ENEMY_FEET.has(e.type)) { const ff = Math.floor(t / (e.type === 'FROSTSTALKER' ? 0.085 : e.type === 'GRUNT' || (ENEMIES[e.type] || {}).ai === 'melee' || (ENEMIES[e.type] || {}).ai === 'charger' ? 0.11 : 0.12) + e.id) % 4, sp = Math.hypot(e.x - (e._dx ?? e.x), e.y - (e._dy ?? e.y)); e._dx = e.x; e._dy = e.y;

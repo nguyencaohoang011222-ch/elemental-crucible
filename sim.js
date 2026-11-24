@@ -110,6 +110,24 @@ export class World {
 }
 
 // ---------------- mô phỏng ----------------
+// các cặp quái có thể chạm nhau (i < j), giữ đúng thứ tự i tăng rồi j tăng như vòng lặp đôi cũ → kết quả mô phỏng không đổi.
+// Ô lưới rộng hơn khoảng đẩy lớn nhất (2r + 30) cộng biên 24 cho phần dịch chuyển trong lúc đẩy, nên không sót cặp nào.
+const PAIRS = [];
+function nearPairs(list) {
+  const n = list.length; PAIRS.length = 0;
+  if (n < 24) { for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) PAIRS.push(i, j); return PAIRS; }
+  let rmax = 0; for (const e of list) { const r = (ENEMIES[e.type] || {}).r || 16; if (r > rmax) rmax = r; }
+  const C = rmax * 2 + 30 + 24, G = new Map(), cx = new Int32Array(n), cy = new Int32Array(n);
+  for (let i = 0; i < n; i++) { const e = list[i], x = Math.floor(e.x / C), y = Math.floor(e.y / C), k = x * 100003 + y; cx[i] = x; cy[i] = y; let b = G.get(k); if (!b) G.set(k, b = []); b.push(i); }
+  const js = [];
+  for (let i = 0; i < n; i++) {
+    js.length = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const b = G.get((cx[i] + dx) * 100003 + cy[i] + dy); if (b) for (const j of b) if (j > i) js.push(j); }
+    if (js.length > 1) js.sort((a, b) => a - b);
+    for (const j of js) PAIRS.push(i, j);
+  }
+  return PAIRS;
+}
 export class Sim {
   constructor(seed = 1, cls = 'KNIGHT') {
     this.seed = seed; this.rand = rng(seed); this.world = new World(seed);
@@ -172,10 +190,20 @@ export class Sim {
     else if (it.fire && !it.fireHeld && p.atkT <= 0) this.basicAttack(0);
   }
   // Mirror Guard: bật đạn bị chém ngược về phía kẻ bắn (150% sát thương)
-  reflectShot(s) {
+  // nhát chém của Knight đỡ đạn quái bay tới phía trước; Mirror Guard (relic) / Reflecting Edge (nâng cấp) bật đạn ngược về kẻ bắn.
+  // Reflecting Edge mở rộng góc + tầm đỡ (cấp 2 rộng hơn nữa) để đỡ đòn định hướng dễ hơn.
+  parryShot(s) {
+    const p = this.p; if (p.cls !== 'KNIGHT' || !(p.swing > 0.06)) return false;
+    const dl = (p.mods && p.mods.deflect) || 0, R = 70 + dl * 18, A = 0.9 + dl * 0.25;
+    if (dist(s.x, s.y, p.x, p.y) > R || Math.abs(angDiff(Math.atan2(s.y - p.y, s.x - p.x), p.aim)) > A) return false;
+    s.life = 0; this.emit('parry', { x: s.x, y: s.y });
+    const m = p.mods || {}, mul = Math.max(m.riposte ? 1.5 : 0, dl >= 2 ? 1.6 : dl ? 1.0 : 0); if (mul > 0) this.reflectShot(s, mul);
+    return true;
+  }
+  reflectShot(s, mul = 1.5) {
     const p = this.p;
           let a = Math.atan2(-s.vy, -s.vx), bd = 1e9; for (const e of this.enemies) { if (e.dead) continue; const ea = Math.atan2(e.y - s.y, e.x - s.x), d = dist(s.x, s.y, e.x, e.y); if (Math.abs(angDiff(ea, Math.atan2(-s.vy, -s.vx))) < 0.6 && d < bd) { bd = d; a = ea; } }
-          this.shots.push({ kind: 'wave', dmg: (s.dmg || 10) * 1.5 * (p.basicMul || 1), speed: 760, life: 0.9, r: 12, pierce: 0, kb: 200, aoeDmg: 0, x: s.x, y: s.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, a, hit: new Set() }); this.emit('riposte', { x: s.x, y: s.y });
+          this.shots.push({ kind: 'wave', dmg: (s.dmg || 10) * mul * (p.basicMul || 1), speed: 760, life: 0.9, r: 12, pierce: 0, kb: 200, aoeDmg: 0, x: s.x, y: s.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, a, hit: new Set() }); this.emit('riposte', { x: s.x, y: s.y });
   }
   damageObs(x, y, r, dmg) { return this.world.damageObstacles(x, y, r, dmg); }
   basicAttack(c) {
@@ -334,15 +362,15 @@ export class Sim {
       this.world.collide(e, d.r);
     }
     // đẩy tách nhau: mềm (dàn đội hình) rồi cứng (không chồng lên nhau)
-    const list = this.enemies;
-    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j], A = ENEMIES[a.type], B = ENEMIES[b.type], R = A.r + B.r + 30, dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+    const list = this.enemies, pairs = nearPairs(list);
+    for (let q = 0; q < pairs.length; q += 2) {
+      const a = list[pairs[q]], b = list[pairs[q + 1]], A = ENEMIES[a.type], B = ENEMIES[b.type], R = A.r + B.r + 30, dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
       if (d2 >= R * R || d2 < 1e-4 || a.spawn > 0 || b.spawn > 0) continue;
       const d = Math.sqrt(d2), k = (R - d) / R * 140 * dt, ma = A.mass || 1, mb = B.mass || 1, wa = mb / (ma + mb), wb = ma / (ma + mb), nx = dx / d, ny = dy / d;
       a.x -= nx * k * 2 * wa; a.y -= ny * k * 2 * wa; b.x += nx * k * 2 * wb; b.y += ny * k * 2 * wb;
     }
-    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j], ra = ENEMIES[a.type].r, rb = ENEMIES[b.type].r, d = dist(a.x, a.y, b.x, b.y);
+    for (let q = 0; q < pairs.length; q += 2) {
+      const a = list[pairs[q]], b = list[pairs[q + 1]], ra = ENEMIES[a.type].r, rb = ENEMIES[b.type].r, d = dist(a.x, a.y, b.x, b.y);
       if (d < ra + rb && d > 0.01) { const o = (ra + rb - d) / 2, nx = (b.x - a.x) / d, ny = (b.y - a.y) / d; a.x -= nx * o; a.y -= ny * o; b.x += nx * o; b.y += ny * o; }
     }
     // dọn quái chết / quá xa
@@ -353,11 +381,8 @@ export class Sim {
     for (const s of this.foes) {
       s.life -= dt; s.x += s.vx * dt; s.y += s.vy * dt;
       if (this.world.blocked(s.x, s.y, s.r)) s.life = 0;
+      else if (this.parryShot(s)) { /* kiếm chém tan / bật lại đạn */ }
       else if (dist(s.x, s.y, p.x, p.y) < s.r + p.r) { s.life = 0; this.hurtPlayer(s.dmg, Math.atan2(s.vy, s.vx)); }
-      else if (p.cls === 'KNIGHT' && p.swing > 0.06 && dist(s.x, s.y, p.x, p.y) < 70 && Math.abs(angDiff(Math.atan2(s.y - p.y, s.x - p.x), p.aim)) < 0.9) {
-        s.life = 0; this.emit('parry', { x: s.x, y: s.y }); // kiếm chém tan đạn
-        if (p.mods && p.mods.riposte) this.reflectShot(s);
-      }
     }
     this.foes = this.foes.filter(s => s.life > 0);
   }

@@ -5,9 +5,9 @@ import { drawTrench } from './trench.js';
 
 const H = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.fillRect(sn(x - z / 2), sn(y - z / 2), z, z); };
-function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)); for (let i = 0; i <= n; i++) sq(ctx, x1 + (x2 - x1) * i / n, y1 + (y2 - y1) * i / n, s, c); }
+function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)), z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i <= n; i++) ctx.rect(sn(x1 + (x2 - x1) * i / n - z / 2), sn(y1 + (y2 - y1) * i / n - z / 2), z, z); ctx.fill(); }
 function bolt(ctx, x1, y1, x2, y2, seed, c1, c2, w = 3) { let px = x1, py = y1; const n = 8; for (let i = 1; i <= n; i++) { const k = i / n, x = x1 + (x2 - x1) * k + (i < n ? (H(i, seed) - 0.5) * 34 : 0), y = y1 + (y2 - y1) * k + (i < n ? (H(seed, i) - 0.5) * 20 : 0); line(ctx, px, py, x, y, WPP * w, c1, WPP); line(ctx, px, py, x, y, WPP, c2, WPP); px = x; py = y; } }
-function ringPix(ctx, x, y, r, s, c, jit = 0, seed = 0) { const n = Math.max(20, Math.floor(r * 6.283 / (WPP * 2))); for (let i = 0; i < n; i++) { const q = i / n * 6.283, rr = r + (H(i, seed) - 0.5) * jit; sq(ctx, x + Math.cos(q) * rr, y + Math.sin(q) * rr, s, c); } }
+function ringPix(ctx, x, y, r, s, c, jit = 0, seed = 0) { const n = Math.max(20, Math.floor(r * 6.283 / (WPP * 2))), z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i < n; i++) { const q = i / n * 6.283, rr = r + (H(i, seed) - 0.5) * jit; ctx.rect(sn(x + Math.cos(q) * rr - z / 2), sn(y + Math.sin(q) * rr - z / 2), z, z); } ctx.fill(); }
 
 // ---------- vật thể đang tồn tại ----------
 export function drawUlts(R, ctx, sim, t) {

@@ -89,6 +89,15 @@ const evN = (g, n) => g.events.filter(e => e.ev === n).length;
   ok(a.hp < 999 && b.hp < 999, 'Juggernaut: dashing through enemies damages both (' + (999 - a.hp | 0) + ' / ' + (999 - b.hp | 0) + ')'); ok(evN(g, 'jugReset') === 1, 'Juggernaut: hitting 2 halves the dash cooldown'); }
 { const g = mk('KNIGHT', 'riposte'), sh = foe(g, 300, 0, 'SHOOTER'); sh.hp = sh.max = 999; g.p.aim = 0; g.p.swing = 0.2; g.foes = [{ x: g.p.x + 50, y: g.p.y, vx: -200, vy: 0, life: 2, dmg: 10, r: 6 }];
   g.updateFoeShots(1 / 60); ok(g.shots.some(s => s.kind === 'wave' && s.vx > 0), 'Mirror Guard: a cut projectile flies back at the shooter'); }
+// Reflecting Edge (nâng cấp Knight): bật đạn về kẻ bắn, đỡ trước khi đạn chạm người, cấp 2 đỡ được góc rộng hơn
+{ const { MINOR_BY_ID: U } = await import('../upgrades.js');
+  const g = mk('KNIGHT'), sh = foe(g, 300, 0, 'SHOOTER'); sh.hp = sh.max = 999; U.deflect.apply(g.p.mods, g); g.p.aim = 0; g.p.swing = 0.2; const hp0 = g.p.hp;
+  g.foes = [{ x: g.p.x + 14, y: g.p.y, vx: -260, vy: 0, life: 2, dmg: 10, r: 7 }]; g.updateFoeShots(1 / 60);
+  const w = g.shots.find(s => s.kind === 'wave' && s.vx > 0); ok(w && Math.abs(w.dmg - 10 * (g.p.basicMul || 1)) < 0.01 && g.p.hp === hp0, 'Reflecting Edge: a swing bounces a point-blank shot back at 100% and you take no damage');
+  const g0 = mk('KNIGHT'); g0.p.aim = 0; g0.p.swing = 0.2; g0.foes = [{ x: g0.p.x + 60, y: g0.p.y + 60, vx: -100, vy: -100, life: 2, dmg: 10, r: 6 }]; g0.updateFoeShots(1 / 60);
+  const g2 = mk('KNIGHT'); U.deflect.apply(g2.p.mods, g2); U.deflect.apply(g2.p.mods, g2); g2.p.aim = 0; g2.p.swing = 0.2; g2.foes = [{ x: g2.p.x + 60, y: g2.p.y + 60, vx: -100, vy: -100, life: 2, dmg: 10, r: 6 }]; g2.updateFoeShots(1 / 60);
+  const w2 = g2.shots.find(s => s.kind === 'wave');
+  ok(g0.foes.length === 1 && g2.foes.length === 0 && w2 && Math.abs(w2.dmg - 16 * (g2.p.basicMul || 1)) < 0.01, 'level 2 reaches further: parries a shot 85px out (base Knight cannot) and returns it at 160%'); }
 { const { MINOR_BY_ID: U } = await import('../upgrades.js');
   { const g = mk('KNIGHT'), e = foe(g, 260, 0); e.hp = e.max = 9999; U.gapcloser.apply(g.p.mods); g.p.aim = 0; const x0 = g.p.x; g.basicAttack(1); ok(g.p.x - x0 > 60 && e.hp < 9999, 'Gap Closer: a charged swing lunges ' + Math.round(g.p.x - x0) + 'px and hits a foe out of reach'); }
   { const g = mk('KNIGHT'); U.quakewave.apply(g.p.mods); g.p.aim = 0; g.basicAttack(1); ok(g.shots.some(s => s.kind === 'wave' && s.pierce >= 99), 'Shockwave Mastery: a full charge sends a ground wave'); }

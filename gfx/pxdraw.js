@@ -3,9 +3,9 @@ import { WPP, sn } from './pixel.js';
 export { WPP, sn };
 export const H = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 export const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.fillRect(sn(x - z / 2), sn(y - z / 2), z, z); };
-export function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)); for (let i = 0; i <= n; i++) sq(ctx, x1 + (x2 - x1) * i / n, y1 + (y2 - y1) * i / n, s, c); }
+export function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)), z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i <= n; i++) ctx.rect(sn(x1 + (x2 - x1) * i / n - z / 2), sn(y1 + (y2 - y1) * i / n - z / 2), z, z); ctx.fill(); }
 export function poly(ctx, pts, s, c) { for (let i = 0; i + 1 < pts.length; i++) line(ctx, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], s, c, WPP); }
-export function disc(ctx, x, y, r, c, sy = 0.85) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.fillRect(X - w, Y + sn(dy * sy), w * 2, WPP); } }
+export function disc(ctx, x, y, r, c, sy = 0.85) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); ctx.beginPath(); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.rect(X - w, Y + sn(dy * sy), w * 2, WPP); } ctx.fill(); }
 // tam giác đặc (quét hàng) — cho lưỡi, gai, mảnh vỡ
 export function tri(ctx, a, b, c2, col) {
   const P = [a, b, c2]; ctx.fillStyle = col; const y0 = Math.min(a[1], b[1], c2[1]), y1 = Math.max(a[1], b[1], c2[1]);

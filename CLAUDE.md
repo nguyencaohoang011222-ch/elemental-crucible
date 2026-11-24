@@ -17,6 +17,18 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - **Anchors:** the weapon hand sits at `HAND_Y` (−2 world px from the foot centre, exported from `gfx/skinlines.js`). Every weapon, muzzle and skin-VFX origin uses `p.y + HAND_Y`, never a hard-coded offset. The player hurtbox is `r: 12` (`sim.js`).
 - Hero Select cards show the skin's diorama (chibi on its biome pedestal), with `cursor: pointer !important`.
 
+## Performance
+
+- Games run on weak laptop GPUs and phones; the frame budget is mostly **draw calls**. Never draw a shape as many separate `fillRect` cells in a loop: put the cells of one colour into one path (`beginPath` → `rect` × n → `fill`), as `disc`, `line` and `ringPix` do in `gfx/*vfx.js`, `drawSurface` (layer/alpha/colour groups) and the particle loop in `render.js`.
+- Never create gradients or canvases per frame. Cache sprites: shadows (`shadow()` in `render.js`), light holes and glows (`gfx/light.js`), Rig frames (white/red tints are built lazily).
+- No O(n²) loops over enemies, tufts or props: use a coarse grid (`nearPairs` in `sim.js`, the enemy grid that tufts query in `render.js`).
+- Graphics quality: `SET.gfx` is `auto` / `high` / `low`; `R.lowQ` turns off coloured light glows, ambient motes and tuft sway, and caps lights (24) and particles (260). Auto switches to low after 3 s under ~45 FPS.
+
+## Trailer Director
+
+- `trailer.js`: press **T** on the title screen for a 32 s scripted trailer (Esc exits, H hides letterbox + captions). Each shot builds a real `Game` (god mode, infinite energy) driven by a bot; the camera uses `R.camZoom` / `R.camTarget` (renderer) for zooms, boss pans and slow-motion punches.
+- `ui === 'trailer'` skips `trackEvents`, so the trailer never touches the player profile. Shots call `keepFight()` so a stage never "clears" mid-shot.
+
 ## Controls (hybrid PC + mobile)
 
 - Three modes in `SET.control`: `wasd`, `mouse` (PC) and `touch` (mobile). The PC / Mobile button in the top-right corner (title screen `#ctlbtn`, in-run `#ctlhud`) toggles between touch and the last PC mode; touch devices start in `touch` the first time.

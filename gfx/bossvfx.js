@@ -4,7 +4,7 @@ import { WPP, sn } from './pixel.js';
 
 const H = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 // đĩa pixel: các hàng ô bám lưới
-export function disc(ctx, x, y, r, c) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.fillRect(X - w, Y + sn(dy), w * 2, WPP); } }
+export function disc(ctx, x, y, r, c) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); ctx.beginPath(); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.rect(X - w, Y + sn(dy), w * 2, WPP); } ctx.fill(); }
 const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.fillRect(sn(x - z / 2), sn(y - z / 2), z, z); };
 
 // bộ màu theo nguyên tố của từng boss: [viền tối, giữa, sáng, rất sáng, lõi]

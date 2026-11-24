@@ -127,13 +127,13 @@ export function foeAI(g, e, d, dt) {
       } else if (e.state === 'tele' && e.st <= 0) {
         const [lx, ly] = leadPt(g, 1.0, 30); e.alt = !e.alt;
         if (e.alt) { // vòng cột băng quanh điểm đoán trước + lõi nổ muộn
-          for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + g.rand() * 0.3, x = lx + Math.cos(a) * 95, y = ly + Math.sin(a) * 95;
-            H(g, { kind: 'circle', x, y, r: 34, t: 0.9 + k * 0.06, dmg: 14 * ds, color: '#9fe6ff', after: () => { if (dist(x, y, g.p.x, g.p.y) > 34 + g.p.r && !g.world.blocked(x, y, 12)) { const o = g.world.addTemp('icecrystal', x, y, 16, 3, 40); o.rise = 0.2; o.v = g.rand(); o.foeIce = true; } } }); }
-          H(g, { kind: 'circle', x: lx, y: ly, r: 52, t: 1.35, dmg: 16 * ds, color: '#9fe6ff', after: () => applyEl(g, lx, ly, 40, 'ICE', { life: 6 }) });
+          for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + g.rand() * 0.3, x = lx + Math.cos(a) * 78, y = ly + Math.sin(a) * 78;   // map 3: 5 cột, vòng 78 (trước 6 cột, 95)
+            H(g, { kind: 'circle', x, y, r: 26, t: 1.05 + k * 0.06, dmg: 10 * ds, color: '#9fe6ff', after: () => { if (dist(x, y, g.p.x, g.p.y) > 26 + g.p.r && !g.world.blocked(x, y, 12)) { const o = g.world.addTemp('icecrystal', x, y, 16, 3, 40); o.rise = 0.2; o.v = g.rand(); o.foeIce = true; } } }); }
+          H(g, { kind: 'circle', x: lx, y: ly, r: 38, t: 1.45, dmg: 12 * ds, color: '#9fe6ff', after: () => applyEl(g, lx, ly, 40, 'ICE', { life: 6 }) });
         } else { // nova chữ thập
-          for (const a of [toP, toP + Math.PI / 2]) H(g, { kind: 'rect', x: lx, y: ly, a, len: 340, width: 40, t: 1.0, dmg: 16 * ds, color: '#9fe6ff', after: () => { for (let u = -150; u <= 150; u += 50) applyEl(g, lx + Math.cos(a) * u, ly + Math.sin(a) * u, 22, 'ICE', { life: 6 }); } });
+          for (const a of [toP, toP + Math.PI / 2]) H(g, { kind: 'rect', x: lx, y: ly, a, len: 220, width: 30, t: 1.15, dmg: 12 * ds, color: '#9fe6ff', after: () => { for (let u = -100; u <= 100; u += 50) applyEl(g, lx + Math.cos(a) * u, ly + Math.sin(a) * u, 22, 'ICE', { life: 6 }); } });
         }
-        g.emit('cast', { x: e.x, y: e.y }); e.state = 'move'; e.st = 3.0 + g.rand() * 1.0;
+        g.emit('cast', { x: e.x, y: e.y }); e.state = 'move'; e.st = 3.8 + g.rand() * 1.2;
       }
       break;
     }
@@ -141,19 +141,19 @@ export function foeAI(g, e, d, dt) {
       if (e.state === 'move') {
         if (dp > 240) mv(g, e, flankDir(g, e, dp, toP, 300), d.speed, dt);
         contact(g, e, d, dp, toP, 1.2, () => chill(g, 1));
-        if (ready(e.alt ? 380 : 260)) {
+        if (ready(e.alt ? 300 : 230)) {
           e.alt = !e.alt; e.ta = toP;
           if (e.alt) { // giơ khiên rồi nện xuống: quạt 5 dải gai băng lởm chởm
-            e.state = 'slamWind'; e.st = 0.7; const x = e.x, y = e.y;
-            for (let k = 0; k < 5; k++) { const a = toP + (k - 2) * 0.24, t = 0.7 + Math.abs(k - 2) * 0.05;
-              H(g, { kind: 'line', x, y, a, len: 240, width: 26, t, dmg: 18 * ds, color: '#9fe6ff', sty: 'ice', after: () => { const pts = []; for (let u = 50; u <= 240; u += 38) { const px = x + Math.cos(a) * u, py = y + Math.sin(a) * u; pts.push([px, py]); applyEl(g, px, py, 20, 'ICE', { life: 6 }); } g.emit('iceSpikes', { pts }); if (k === 2) { g.emit('thud', { x, y }); } } }); }
+            e.state = 'slamWind'; e.st = 0.85; const x = e.x, y = e.y;
+            for (let k = 0; k < 3; k++) { const a = toP + (k - 1) * 0.3, t = 0.85 + Math.abs(k - 1) * 0.05;   // map 3: 3 dải (trước 5)
+              H(g, { kind: 'line', x, y, a, len: 190, width: 22, t, dmg: 13 * ds, color: '#9fe6ff', sty: 'ice', after: () => { const pts = []; for (let u = 50; u <= 190; u += 38) { const px = x + Math.cos(a) * u, py = y + Math.sin(a) * u; pts.push([px, py]); applyEl(g, px, py, 20, 'ICE', { life: 6 }); } g.emit('iceSpikes', { pts }); if (k === 1) { g.emit('thud', { x, y }); } } }); }
           } else {
           const dir = e.id % 2 ? 1 : -1; e.state = 'beam'; e.st = 2.0;
-          H(g, { kind: 'beam', owner: e, x: e.x, y: e.y, a: toP - 0.9 * dir, n: 1, len: 380, width: 30, t: 0.8, dur: 1.2, spin: 1.5 * dir, hitCd: 0, dmg: 18 * ds, color: '#9fe6ff', sty: 'ice', trail: 'ICE', onHitP: () => chill(g, 1) });
+          H(g, { kind: 'beam', owner: e, x: e.x, y: e.y, a: toP - 0.7 * dir, n: 1, len: 230, width: 22, t: 1.0, dur: 1.0, spin: 1.1 * dir, hitCd: 0, dmg: 12 * ds, color: '#9fe6ff', sty: 'ice', trail: 'ICE', onHitP: () => chill(g, 1) });
           }
         }
       } else if (e.state === 'slamWind' && e.st <= 0) { e.state = 'slam'; e.st = 0.5; }
-      else if ((e.state === 'beam' || e.state === 'slam') && e.st <= 0) { e.state = 'move'; e.st = 3.2 + g.rand() * 1.2; }
+      else if ((e.state === 'beam' || e.state === 'slam') && e.st <= 0) { e.state = 'move'; e.st = 3.8 + g.rand() * 1.4; }
       break;
     }
     // ---------- núi lửa ----------

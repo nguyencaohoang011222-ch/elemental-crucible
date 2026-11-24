@@ -4,13 +4,27 @@ import { WPP, hash2 } from './pixel.js';
 import { SC } from '../env.js';
 
 const P = WPP;
-export function drawSurface(ctx, surf, view, t, lights) {
+// bộ ghi: các ô mặt đất không chồng lên nhau, nên gom mọi lệnh tô theo (thứ tự trong ô, alpha, màu) rồi tô mỗi nhóm một lần
+// → vài chục lệnh fill thay cho hàng nghìn fillRect mỗi khung. Vòng tròn (độc) vẽ thẳng lên canvas thật.
+const REC = {
+  real: null, layer: 0, fillStyle: '#000', globalAlpha: 1, groups: new Map(),
+  fillRect(x, y, w, h) { const a = Math.round(this.globalAlpha * 20) / 20; if (a <= 0) { this.layer++; return; } const k = this.layer + '|' + a + '|' + this.fillStyle; let g = this.groups.get(k); if (!g) this.groups.set(k, g = { l: this.layer, a, c: this.fillStyle, r: [] }); g.r.push(x, y, w, h); this.layer++; },
+  beginPath() { this.real.beginPath(); }, arc(...v) { this.real.arc(...v); }, fill() { this.real.globalAlpha = this.globalAlpha; this.real.fillStyle = this.fillStyle; this.real.fill(); this.real.globalAlpha = 1; },
+};
+function flushRec() {
+  const ctx = REC.real, list = [...REC.groups.values()].sort((a, b) => a.l - b.l);
+  for (const g of list) { ctx.globalAlpha = g.a; ctx.fillStyle = g.c; ctx.beginPath(); const r = g.r; for (let i = 0; i < r.length; i += 4) ctx.rect(r[i], r[i + 1], r[i + 2], r[i + 3]); ctx.fill(); }
+  ctx.globalAlpha = 1; REC.groups.clear(); REC.real = null;
+}
+export function drawSurface(real, surf, view, t, lights) {
   if (!surf || !surf.cells.size) return;
+  const ctx = REC; REC.real = real; REC.globalAlpha = 1; REC.groups.clear();
   const x0 = view.ox - SC, x1 = view.ox + view.w + SC, y0 = view.oy - SC, y1 = view.oy + view.h + SC;
   let nl = 0;
   for (const c of surf.cells.values()) {
     const X = c.i * SC, Y = c.j * SC; if (X < x0 || X > x1 || Y < y0 || Y > y1) continue;
     const h = hash2(c.i, c.j, 17), fade = Math.min(1, c.t / 1.2);
+    ctx.layer = 0; ctx.globalAlpha = 1;
     switch (c.type) {
       case 'fire': {
         ctx.fillStyle = 'rgba(60,16,6,.45)'; ctx.fillRect(X, Y, SC, SC);
@@ -65,6 +79,7 @@ export function drawSurface(ctx, surf, view, t, lights) {
       case 'thorn': { ctx.globalAlpha = fade; ctx.fillStyle = '#3a4a1e'; for (let k = 0; k < 4; k++) ctx.fillRect(X + ((h * 11 + k * 5) % 6) * 3, Y + ((h * 7 + k * 3) % 6) * 3, 6, P); ctx.fillStyle = '#c8d8a0'; ctx.fillRect(X + 9, Y + 6, P, P); ctx.fillRect(X + 3, Y + 15, P, P); ctx.globalAlpha = 1; break; }
     }
   }
+  flushRec();
 }
 
 // bẫy của bản đồ: dấu trên sàn, bóng báo trước, vật rơi / cột phun

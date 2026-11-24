@@ -9,9 +9,9 @@ export function catOfSkill(sk) { if (!sk) return 'basic'; if (sk.group === 'ULTI
 
 const H = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.fillRect(sn(x - z / 2), sn(y - z / 2), z, z); };
-function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)); for (let i = 0; i <= n; i++) sq(ctx, x1 + (x2 - x1) * i / n, y1 + (y2 - y1) * i / n, s, c); }
+function line(ctx, x1, y1, x2, y2, s, c, step = WPP * 2) { const L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(L / step)), z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i <= n; i++) ctx.rect(sn(x1 + (x2 - x1) * i / n - z / 2), sn(y1 + (y2 - y1) * i / n - z / 2), z, z); ctx.fill(); }
 function ring(ctx, x, y, r, s, c, gaps = 0, rot = 0) { const n = Math.max(16, Math.floor(r * 6.283 / (WPP * 2))); for (let i = 0; i < n; i++) { if (gaps && Math.floor(i / (n / gaps / 2)) % 2) continue; const q = rot + i / n * 6.283; sq(ctx, x + Math.cos(q) * r, y + Math.sin(q) * r * 0.85, s, c); } }
-function disc(ctx, x, y, r, c) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.fillRect(X - w, Y + sn(dy * 0.85), w * 2, WPP); } }
+function disc(ctx, x, y, r, c) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); ctx.beginPath(); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.rect(X - w, Y + sn(dy * 0.85), w * 2, WPP); } ctx.fill(); }
 function star(ctx, x, y, r, c, pts = 5, rot = -Math.PI / 2) { const P = []; for (let i = 0; i < pts; i++) { const a = rot + i * 6.283 / pts; P.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); } for (let i = 0; i < pts; i++) { const [a1, b1] = P[i], [a2, b2] = P[(i + 2) % pts]; line(ctx, a1, b1, a2, b2, WPP, c, WPP); } }
 
 // ---------- chủ đề ----------

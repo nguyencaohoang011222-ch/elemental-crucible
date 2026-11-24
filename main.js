@@ -23,6 +23,7 @@ import * as FG from './forge.js';
 import * as RL from './relics.js';
 import * as ON from './online.js';
 import * as TM from './mobile.js';
+import { startTrailer, stopTrailer, trailerFrame, toggleCaptions } from './trailer.js';
 import { forgeInfo } from './forgeups.js';
 import { MINOR_BY_ID } from './upgrades.js';
 import { STAT_DROPS } from './game.js';
@@ -33,9 +34,9 @@ const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
 
 // ---------- cài đặt (lưu trên máy) ----------
-const SET = { master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake: true, numbers: true, hints: true, autopause: true, control: 'wasd', fps: false, light: true };
+const SET = { gfx: 'auto', master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake: true, numbers: true, hints: true, autopause: true, control: 'wasd', fps: false, light: true };
 { let saved = {}; try { saved = JSON.parse(localStorage.getItem('ea-settings') || '{}'); } catch (e) { /* trình duyệt chặn lưu trữ */ } Object.assign(SET, saved); if (!saved.control && matchMedia('(pointer: coarse)').matches) SET.control = 'touch'; }   // máy cảm ứng: lần đầu tự chọn điều khiển Touch
-function saveSet() { try { localStorage.setItem('ea-settings', JSON.stringify(SET)); } catch (e) { /* bỏ qua */ } R.opts.shake = SET.shake; R.opts.numbers = SET.numbers; R.opts.fps = SET.fps; R.opts.light = SET.light; AU.setVolumes(SET.master / 100, SET.sfx / 100, SET.music / 100); AU.setMusicOn(SET.musicOn); AU.setSfxOn(SET.sfxOn); }
+function saveSet() { try { localStorage.setItem('ea-settings', JSON.stringify(SET)); } catch (e) { /* bỏ qua */ } R.opts.shake = SET.shake; R.opts.numbers = SET.numbers; R.opts.fps = SET.fps; R.opts.light = SET.light; applyGfx(); AU.setVolumes(SET.master / 100, SET.sfx / 100, SET.music / 100); AU.setMusicOn(SET.musicOn); AU.setSfxOn(SET.sfxOn); }
 saveSet();
 // camera khoá tầm nhìn: luôn thấy đúng VIEW_ROWS pixel game theo chiều dọc (≈800 đơn vị thế giới ≈ 16.7 ô), bất kể cỡ cửa sổ / toàn màn hình / devicePixelRatio.
 // canvas vẽ ở độ phân giải VIEW_ROWS×P (P nguyên → pixel đều), CSS kéo giãn cho vừa cửa sổ; chiều ngang theo tỉ lệ màn hình.
@@ -409,6 +410,13 @@ function toTitle() {
   game = new Game(7, 'KNIGHT', { training: true }); R.reset(); ui = 'title';
   $('hud').classList.add('hidden'); $('title').classList.add('on');
 }
+// ---------- Trailer Director (T ở màn hình chính) ----------
+function runTrailer() {
+  ensureAudio(); for (const m of [...modals]) closeModal(m);
+  $('title').classList.remove('on'); $('hud').classList.add('hidden');
+  startTrailer({ R, SFX, setGame: g => { game = g; }, setUi: u => { ui = u; }, toTitle,
+    bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } });
+}
 function pause() {
   if (ui !== 'play') return; ui = 'pause'; resetInput();
   const g = game;
@@ -576,7 +584,7 @@ $('nrback').onclick = () => { if (nrStep === 2) { nrStep = 1; renderNewRun(); } 
 
 // ---------- cài đặt ----------
 function openSettings() {
-  $('s-master').value = SET.master; $('s-sfx').value = SET.sfx; $('s-music').value = SET.music; $('s-musicon').checked = SET.musicOn; $('s-sfxon').checked = SET.sfxOn; $('s-shake').checked = SET.shake; $('s-numbers').checked = SET.numbers; $('s-hints').checked = SET.hints; $('s-autopause').checked = SET.autopause; $('s-fps').checked = SET.fps; $('s-light').checked = SET.light;
+  $('s-master').value = SET.master; $('s-sfx').value = SET.sfx; $('s-music').value = SET.music; $('s-musicon').checked = SET.musicOn; $('s-sfxon').checked = SET.sfxOn; $('s-shake').checked = SET.shake; $('s-numbers').checked = SET.numbers; $('s-hints').checked = SET.hints; $('s-autopause').checked = SET.autopause; $('s-fps').checked = SET.fps; $('s-light').checked = SET.light; syncGfx();
   syncControl(); openModal('settings');
 }
 $('s-master').oninput = e => { SET.master = +e.target.value; saveSet(); };
@@ -590,6 +598,8 @@ $('s-hints').onchange = e => { SET.hints = e.target.checked; saveSet(); };
 $('s-autopause').onchange = e => { SET.autopause = e.target.checked; saveSet(); };
 $('s-fps').onchange = e => { SET.fps = e.target.checked; saveSet(); };
 $('s-light').onchange = e => { SET.light = e.target.checked; saveSet(); };
+for (const b of $('gfxseg').children) b.onclick = () => { SET.gfx = b.dataset.q; autoLow = false; saveSet(); syncGfx(); };
+function syncGfx() { for (const b of $('gfxseg').children) b.classList.toggle('on', b.dataset.q === SET.gfx); }
 
 // ---------- thưởng sau wave ----------
 function openReward() {
@@ -810,6 +820,8 @@ $('tradep').onclick = () => openSmith();
 // ---------- input ----------
 addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) { if (e.code === 'Enter' && e.target.id === 'nickin') $('nickok').click(); return; }   // đang gõ nickname: không bắt phím game
+  if (ui === 'trailer') { e.preventDefault(); if (e.repeat) return; if (e.code === 'Escape') stopTrailer(); else if (e.code === 'KeyH') toggleCaptions(); return; }   // trailer: Esc thoát, H ẩn/hiện letterbox + chú thích
+  if (ui === 'title' && !modals.length && e.code === 'KeyT' && !e.repeat) { runTrailer(); return; }
   if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
   if (e.code === 'KeyM') { muted = !muted; AU.setMuted(muted); audioToast(muted ? 'All sound muted' : 'Sound on'); return; }
@@ -977,10 +989,15 @@ function showEnd() {
   openModal('end');
 }
 
+// ---------- chất lượng đồ hoạ: High / Low / Auto (Auto bắt đầu ở High, tự chuyển Low nếu máy chậm) ----------
+var autoLow = false, slowT = 0;   // var: saveSet() gọi applyGfx() từ đầu file, trước dòng này
+function applyGfx() { R.lowQ = SET.gfx === 'low' || (SET.gfx === 'auto' && autoLow); }
 // ---------- vòng lặp ----------
 let last = performance.now(), acc = 0;
 function frame(now, manual) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  if (ui === 'trailer') { trailerFrame(dt); AU.music(ui !== 'trailer' ? 'title' : ((game.boss && !game.boss.dead) ? 'boss_' : 'map_') + (game.theme || 'forest')); AU.duck(false); if (!manual) requestAnimationFrame(frame); return; }
+  if (!manual && ui === 'play' && SET.gfx === 'auto' && !autoLow && !document.hidden) { slowT = R.fps < 45 ? slowT + dt : Math.max(0, slowT - dt * 0.5); if (slowT > 3) { autoLow = true; applyGfx(); } }
   const wm = worldMouse();
   if (ui === 'play' && !game.over) {
     if (game.state === 'reward') openReward();
