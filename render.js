@@ -780,7 +780,8 @@ export class Renderer {
     const fr = this.rig.frame('b', b.type, P);
     if (!fr.gold) fr.gold = tintOf(fr.img, '#ffd34a');
     const flashW = st === 'wind' && t - an.t0 < 0.07; // khung loé vàng báo hiệu
-    const img = (b.flash > 0 || b.invuln > 0 && Math.floor(t * 16) % 2) ? fr.white : flashW ? fr.gold : fr.img, w = img.width * WPP, h = img.height * WPP;
+    // trúng đòn: phủ trắng mờ lên sprite (không thay hẳn bằng khối trắng) để boss vẫn rõ hình khi bị dồn đòn liên tục
+    const blinkW = b.invuln > 0 && Math.floor(t * 16) % 2, img = blinkW ? fr.white : flashW ? fr.gold : fr.img, w = img.width * WPP, h = img.height * WPP, hitA = !blinkW && b.flash > 0 ? 0.45 * Math.min(1, b.flash / 0.08) : 0;
     const [sqx, sqy] = squash(st, f);
     const spawnK = b.spawn > 0 ? Math.max(0, 1 - b.spawn / 1.6) : 1, fly = b.type === 'SOVEREIGN';
     ctx.fillStyle = fly ? 'rgba(20,8,40,.45)' : 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(b.x, b.y + b.r * 0.55, b.r * (1.1 - Math.min(0.5, b.z / 500)) * (fly ? 0.7 : 1), b.r * 0.4 * (fly ? 0.7 : 1), 0, 0, 7); ctx.fill();
@@ -791,6 +792,7 @@ export class Renderer {
     const float = fly ? sn(Math.sin(t * 2) * 6) - 27 : 0, face = Math.cos(b.face) < 0 ? -1 : 1, sk = b.stagger > 0 ? Math.sin(t * 22) * 0.05 : 0;
     ctx.translate(sn(b.x), sn(b.y - b.z) + float); ctx.translate(0, sn(b.r * 0.55)); ctx.rotate(sk); ctx.scale(face * (0.6 + 0.4 * spawnK) * sqx, (0.6 + 0.4 * spawnK) * sqy);
     ctx.drawImage(img, -w / 2, -h + WPP, w, h);
+    if (hitA > 0) { ctx.globalAlpha *= hitA; ctx.drawImage(fr.white, -w / 2, -h + WPP, w, h); }
     ctx.restore();
     if (wbm && fr.img.tip) { const s = 0.6 + 0.4 * spawnK, toW = q => [b.x + face * s * sqx * (-w / 2 + q[0] * WPP), b.y - b.z + float + b.r * 0.55 + s * sqy * (-h + WPP + q[1] * WPP)]; wbm.vo = [toW(fr.img.tip), toW(fr.img.palm)]; }   // tia phát đúng từ đầu gậy và lòng bàn tay
     const brh = fr.img.mouth ? sim.hazards.find(h => h.owner === b && !h.done && h.kind === 'arc' && h.arc < 0.6) : null;

@@ -23,7 +23,7 @@ import * as FG from './forge.js';
 import * as RL from './relics.js';
 import * as ON from './online.js';
 import * as TM from './mobile.js';
-import { startTrailer, stopTrailer, trailerFrame, toggleCaptions } from './trailer.js';
+import { startTrailer, stopTrailer, trailerFrame, toggleCaptions, trailerTime, renderTrailerAudio } from './trailer.js';
 import { forgeInfo } from './forgeups.js';
 import { MINOR_BY_ID } from './upgrades.js';
 import { STAT_DROPS } from './game.js';
@@ -411,11 +411,11 @@ function toTitle() {
   $('hud').classList.add('hidden'); $('title').classList.add('on');
 }
 // ---------- Trailer Director (T ở màn hình chính) ----------
-function runTrailer() {
-  ensureAudio(); for (const m of [...modals]) closeModal(m);
+function runTrailer(record) {
+  ensureAudio(); AU.music(null); for (const m of [...modals]) closeModal(m);
   $('title').classList.remove('on'); $('hud').classList.add('hidden');
-  startTrailer({ R, SFX, setGame: g => { game = g; }, setUi: u => { ui = u; }, toTitle,
-    bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } });
+  startTrailer({ R, SFX, audioCtx: () => AU.ensure(), setGame: g => { game = g; }, setUi: u => { ui = u; }, toTitle,
+    bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } }, { record: !!record });
 }
 function pause() {
   if (ui !== 'play') return; ui = 'pause'; resetInput();
@@ -996,7 +996,7 @@ function applyGfx() { R.lowQ = SET.gfx === 'low' || (SET.gfx === 'auto' && autoL
 let last = performance.now(), acc = 0;
 function frame(now, manual) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
-  if (ui === 'trailer') { trailerFrame(dt); AU.music(ui !== 'trailer' ? 'title' : ((game.boss && !game.boss.dead) ? 'boss_' : 'map_') + (game.theme || 'forest')); AU.duck(false); if (!manual) requestAnimationFrame(frame); return; }
+  if (ui === 'trailer') { AU.music(null); AU.duck(false); trailerFrame(dt); if (!manual) requestAnimationFrame(frame); return; }   // trailer tự phát nhạc riêng: tắt nhạc sảnh/biome
   if (!manual && ui === 'play' && SET.gfx === 'auto' && !autoLow && !document.hidden) { slowT = R.fps < 45 ? slowT + dt : Math.max(0, slowT - dt * 0.5); if (slowT > 3) { autoLow = true; applyGfx(); } }
   const wm = worldMouse();
   if (ui === 'play' && !game.over) {
@@ -1049,7 +1049,8 @@ window.__ea = {
   get game() { return game; }, R, startRun, openBag, closeBag, get mSel() { return mSel; }, set mSel(v) { mSel = v; renderBag(); }, SET, startTraining, pause, resume, openReward, pickReward, toTitle, get ui() { return ui; },
   frames: n => { for (let i = 0; i < n; i++) frame(last + 1000 / 60, true); },
   press: code => { window.dispatchEvent(new KeyboardEvent('keydown', { code })); window.dispatchEvent(new KeyboardEvent('keyup', { code })); },
-  shot: async n => fetch('/save/' + n, { method: 'POST', body: cv.toDataURL('image/png') }).then(r => r.text())
+  shot: async n => fetch('/save/' + n, { method: 'POST', body: cv.toDataURL('image/png') }).then(r => r.text()),
+  trailer: { start: record => runTrailer(record), time: trailerTime, audio: renderTrailerAudio }
 };
 requestAnimationFrame(frame);
 TM.initMobile({ SET, game: () => game, slot: i => { if (ui === 'play' && !modals.length) slotQ.push(i); }, dash: () => { if (ui === 'play' && !modals.length) dashQ = true; }, potion: k => { if (ui === 'play' && !modals.length) potQ = k; } });
