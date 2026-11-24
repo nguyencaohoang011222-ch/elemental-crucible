@@ -7,14 +7,17 @@ import { Game } from './game.js';
 import * as PR from './profile.js';
 import { ROSTER } from './env.js';
 import { TrailerAudio, wavDataURL, DROP, BEAT } from './trailerAudio.js';
+import { iconSkill } from './gfx/icons.js';
 
 const DT = 1 / 60, TAU = Math.PI * 2;
 const ease = k => k < 0 ? 0 : k > 1 ? 1 : k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;   // easeInOutCubic
 const lerp = (a, b, k) => a + (b - a) * k;
 const TAGLINE = 'FORGE ELEMENTS • FELL TITANS';
 const WIPE = 0.45;                                   // chuyển cảnh 0.45s, cắt cảnh ở giữa
-const FLASH_AT = Math.round(31.1 / BEAT) * BEAT;     // chớp sét cuối đúng phách (nhạc cắt tại đây)
-const TITLE_AT = 32.0, SLAM_AT = TITLE_AT + 0.22, END_AT = 35.6;
+const FLASH_AT = Math.round(32.6 / BEAT) * BEAT;     // chớp sét cuối đúng phách (nhạc cắt tại đây)
+const TITLE_AT = 33.5, SLAM_AT = TITLE_AT + 0.22, END_AT = 37.1;
+// mốc cảnh ghép lõi (giây trong cảnh): mở bảng, 3 cú bấm chọn lõi, bấm MERGE, đóng bảng
+const MERGE_T = { open: 0.5, c: [1.15, 1.8, 2.45], btn: 3.3, close: 4.1 };
 export const TRAILER_LEN = END_AT;
 
 let A = null;      // api từ main.js: { R, setGame, setUi, toTitle, bag, audioCtx }
@@ -124,20 +127,23 @@ function shots() {
       if (lt >= DROP - 0.04 && !S.dropped) { S.dropped = true; slow(0.35, 0.3, 1.15); sfx('burst'); return { noFire: true, aim: crowd(g) }; }
       return lt < 1.3 ? { hold: true, noFire: true, noCast: true, noDash: true, noDodge: true } : {}; },
     cam(lt) { return { zoom: lt < 0.7 ? 1.4 : lerp(1.4, 0.9, ease((lt - 0.7) / 2.4)) }; } });
-  // 2. Ghép lõi: mở Bag, chọn 3 lõi đơn → Ultimate → tung ngay vào đám đông (quay chậm + đẩy cận lúc nổ)
-  L.push({ t0: 5.0, dur: 5.0, wipe: 'slash', cap: ['FORGE ELEMENTAL CORES', 'Merge any elements into new skills'],
-    setup() { const g = mk('MAGE', 'celestial', 3, 777); g.enemies = []; g.spawnQ = []; g.p.cores = [{ type: 'el', el: 'FIRE' }, { type: 'el', el: 'WATER' }, { type: 'el', el: 'EARTH' }, { type: 'duo', els: ['WIND', 'FIRE'] }]; g.p.cores.length = 10; ring(g, 16, 300); ff(g, 0.25); S.bagStep = 0; S.ultCast = false; },
-    tick(lt) { const g = S.g, b = A.bag;
-      const steps = [[0.45, () => { b.open(); S.paused = true; sfx('charge'); }], [0.7, () => { b.sel(0); sfx('kill'); }], [0.9, () => { b.sel(1); sfx('kill'); }], [1.1, () => { b.sel(2); sfx('kill'); }], [1.55, () => { b.merge(); sfx('morph'); }], [2.0, () => { b.close(); S.paused = false; }]];
-      while (S.bagStep < steps.length && lt >= steps[S.bagStep][0]) steps[S.bagStep++][1]();
-      if (lt > 2.25 && !S.ultCast) { S.ultCast = true; const i = g.p.cores.findIndex(c => c && c.type === 'tri'), c = crowd(g); if (i >= 0 && i < 4) { slow(0.35, 0.3, 1.15, c); sfx('burst'); return { slots: [i], aim: c, noFire: true }; } }
-      return lt < 2.7 ? { noCast: true, noDash: true, aim: crowd(g) } : {}; },
-    cam(lt) { return { zoom: lt < 2.1 ? 1.08 : lerp(1.08, 0.92, ease((lt - 2.1) / 1.0)) }; } });
+  // 2. Ghép lõi (6.5s): bảng Merge vẽ trong canvas, con trỏ chọn Lửa → Nước → Đất, bấm MERGE → Ultimate bay về thanh chiêu → tung vào đám đông
+  L.push({ t0: 5.0, dur: 6.5, wipe: 'slash', merge: true, cap: ['FORGE ELEMENTAL CORES', 'Merge any elements into new skills'],
+    setup() { const g = mk('MAGE', 'celestial', 3, 777); g.enemies = []; g.spawnQ = []; g.p.cores = [{ type: 'el', el: 'FIRE' }, { type: 'el', el: 'WATER' }, { type: 'el', el: 'EARTH' }, { type: 'duo', els: ['WIND', 'FIRE'] }]; g.p.cores.length = 10; ring(g, 16, 300); ff(g, 0.25);
+      const img = c => { const im = new Image(); im.src = iconSkill(g.coreSkill(c)); return im; }, tri = { type: 'tri', els: ['FIRE', 'WATER', 'EARTH'] }, ts = g.coreSkill(tri);
+      S.mui = { icons: g.p.cores.slice(0, 4).map(img), names: g.p.cores.slice(0, 4).map(c => g.coreSkill(c).name), res: img(tri), resName: ts ? ts.name : 'Ultimate', step: 0, merged: false }; S.ultCast = false; },
+    tick(lt) { const g = S.g, M = MERGE_T, U = S.mui;
+      if (lt >= M.open && lt < M.close) S.paused = true; else if (S.paused && lt >= M.close) S.paused = false;
+      const ev = [[M.open, () => sfx('charge')], [M.c[0], () => sfx('kill')], [M.c[1], () => sfx('kill')], [M.c[2], () => sfx('kill')], [M.btn, () => { sfx('morph'); sfx('burst'); const r = g.mergeCores([0, 1, 2]); U.merged = !r.error; }], [M.close, () => sfx('whoosh')]];
+      while (U.step < ev.length && lt >= ev[U.step][0]) ev[U.step++][1]();
+      if (lt > M.close + 0.35 && !S.ultCast) { S.ultCast = true; const i = g.p.cores.findIndex(c => c && c.type === 'tri'), c = crowd(g); if (i >= 0 && i < 4) { slow(0.35, 0.3, 1.15, c); sfx('burst'); return { slots: [i], aim: c, noFire: true }; } }
+      return lt < M.close + 0.8 ? { noCast: true, noDash: true, aim: crowd(g) } : {}; },
+    cam(lt) { const M = MERGE_T; return { zoom: lt < M.open ? 1.0 : lt < M.close ? 1.08 : lerp(1.08, 0.92, ease((lt - M.close) / 1.2)) }; } });
   // 3–6. Titan: boss đánh hết sức, nhân vật đổi skin giữa trận
-  L.push(bossShot(10.0, 5.5, 10, 'RANGER', 'starlight', 9010, { wipe: 'whip', kicker: 'FELL COLOSSAL TITANS', morphFrom: '' }));
-  L.push(bossShot(15.5, 5.5, 15, 'MAGE', 'frostbound', 9015, { wipe: 'slash' }));
-  L.push(bossShot(21.0, 5.5, 20, 'KNIGHT', 'ignivar', 9020, { wipe: 'whip', morphFrom: 'dragonknight' }));
-  L.push(bossShot(26.5, 5.5, 25, 'MAGE', 'stormcrown', 9025, { wipe: 'slash', final: true, ultAt: 3.6 }));
+  L.push(bossShot(11.5, 5.5, 10, 'RANGER', 'starlight', 9010, { wipe: 'whip', kicker: 'FELL COLOSSAL TITANS', morphFrom: '' }));
+  L.push(bossShot(17.0, 5.5, 15, 'MAGE', 'frostbound', 9015, { wipe: 'slash' }));
+  L.push(bossShot(22.5, 5.5, 20, 'KNIGHT', 'ignivar', 9020, { wipe: 'whip', morphFrom: 'dragonknight' }));
+  L.push(bossShot(28.0, 5.5, 25, 'MAGE', 'stormcrown', 9025, { wipe: 'slash', final: true, ultAt: 3.6 }));
   return L;
 }
 
@@ -206,12 +212,51 @@ function overlay(c, R, dt, lt, sh, inTitle) {
   if (inTitle) { titleCard(c, W, H, S.t - TITLE_AT, px); drawWipe(c, W, H); return; }
   if (sh.final && S.t > FLASH_AT + 0.15) { c.globalAlpha = Math.min(1, (S.t - FLASH_AT - 0.15) / 0.6); c.fillStyle = '#0b0f0d'; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
   if (S.flash > 0) { c.globalAlpha = Math.min(1, S.flash); c.fillStyle = '#f4fbff'; c.fillRect(0, 0, W, H); c.globalAlpha = 1; S.flash = Math.max(0, S.flash - dt * 2.4); }
+  if (sh.merge && S.mui) mergeUI(c, W, H, lt, px);
   if (S.caps) {
     const bh = px(28) * ease(S.t / 0.5); c.fillStyle = '#000'; c.fillRect(0, 0, W, bh); c.fillRect(0, H - bh, W, bh);
     const cap = sh.boss && S.g.boss ? [S.g.boss.def.name.toUpperCase(), S.g.boss.def.epithet] : sh.cap;
     if (cap && lt > 0.35) lowerThird(c, cap, lt - 0.35, sh.dur - 1.0, W, H, px, sh.kicker);
   }
   drawWipe(c, W, H);
+}
+// ---------- bảng ghép lõi + con trỏ chuột (vẽ trong canvas) ----------
+const CURSOR = ['o.........', 'oo........', 'oWo.......', 'oWWo......', 'oWWWo.....', 'oWWWWo....', 'oWWWWWo...', 'oWWWWWWo..', 'oWWWWWWWo.', 'oWWWWWoooo', 'oWWoWWo...', 'oWo.oWWo..', 'oo..oWWo..', 'o....oWWo.', '.....oWWo.', '......oo..'];
+const ELC = ['#ff7a3c', '#5bb8ff', '#d4b46e', '#a6ebcb'];
+function mergeUI(c, W, H, lt, px) {
+  const M = MERGE_T, U = S.mui, open = ease((lt - M.open) / 0.3) * (1 - ease((lt - M.close) / 0.3)); if (open <= 0) return;
+  c.save(); c.globalAlpha = 0.55 * open; c.fillStyle = '#04070680'; c.fillRect(0, 0, W, H); c.globalAlpha = open;
+  const pw = px(760), ph = px(360), x0 = W / 2 - pw / 2, y0 = H * 0.46 - ph / 2 + (1 - open) * px(40), S2 = px(84), gap = px(14);
+  // khung bảng: nền tối, viền vàng, vát góc pixel
+  c.fillStyle = '#0f1714'; c.fillRect(x0, y0, pw, ph); c.strokeStyle = '#d4af37'; c.lineWidth = px(3); c.strokeRect(x0, y0, pw, ph); c.fillStyle = '#09080f'; for (const [x, y] of [[x0, y0], [x0 + pw - px(6), y0], [x0, y0 + ph - px(6)], [x0 + pw - px(6), y0 + ph - px(6)]]) c.fillRect(x, y, px(6), px(6));
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic'; c.font = `800 ${px(24)}px "Pixelify Sans",monospace`; c.fillStyle = '#d4af37'; c.fillText('Inventory & Merge', x0 + px(24), y0 + px(40));
+  c.font = `700 ${px(12)}px "Pixelify Sans",monospace`; c.fillStyle = '#8a9a90'; c.fillText('SKILL BAR', x0 + px(24), y0 + px(70)); c.fillText('MERGE TABLE', x0 + px(24), y0 + px(196));
+  const bar = i => ({ x: x0 + px(24) + i * (S2 + gap), y: y0 + px(80) }), tab = i => ({ x: x0 + px(24) + i * (S2 + gap), y: y0 + px(206) }), res = { x: x0 + px(24) + 3 * (S2 + gap) + px(44), y: y0 + px(206) }, btn = { x: x0 + pw - px(200), y: y0 + px(226), w: px(170), h: px(48) };
+  const slot = (p, col, on) => { c.fillStyle = '#0d1512'; c.fillRect(p.x, p.y, S2, S2); c.strokeStyle = col; c.lineWidth = px(on ? 4 : 2); c.strokeRect(p.x, p.y, S2, S2); };
+  const icon = (im, p, k = 1) => { if (im && im.complete && im.naturalWidth) { const s = S2 * 0.72 * k; c.imageSmoothingEnabled = false; c.drawImage(im, p.x + S2 / 2 - s / 2, p.y + S2 / 2 - s / 2, s, s); } };
+  const picked = i => lt >= M.c[i];
+  // thanh chiêu: lõi đã chọn mờ đi; sau khi ghép, ô 1 nhận Ultimate
+  for (let i = 0; i < 4; i++) { const p = bar(i); slot(p, i < 3 && picked(i) && !U.merged ? '#ffffff' : ELC[i], i < 3 && picked(i) && !U.merged); const done = U.merged && lt >= M.btn + 0.45;
+    if (i === 0 && done) { icon(U.res, p, 1 + Math.max(0, 0.25 - (lt - M.btn - 0.45)) ); } else if (!(U.merged && i < 3)) { c.globalAlpha = open * (i < 3 && picked(i) ? 0.35 : 1); icon(U.icons[i], p); c.globalAlpha = open; } }
+  // bàn ghép: lõi bay từ thanh chiêu xuống trong 0.3s
+  for (let i = 0; i < 3; i++) { const p = tab(i); slot(p, '#2a3a30', false); if (!picked(i) || (U.merged && lt > M.btn + 0.15)) continue; const k = ease((lt - M.c[i]) / 0.3), a = bar(i); icon(U.icons[i], { x: lerp(a.x, p.x, k), y: lerp(a.y, p.y, k) }); }
+  c.fillStyle = '#8a9a90'; c.font = `800 ${px(26)}px "Pixelify Sans",monospace`; c.fillText('\u2192', res.x - px(34), res.y + S2 / 2 + px(9));
+  // ô kết quả: hiện bản xem trước khi đủ 3 lõi, lóe sáng lúc bấm MERGE rồi bay về thanh chiêu
+  slot(res, lt >= M.c[2] + 0.3 ? '#f0a8ff' : '#2a3a30', lt >= M.c[2] + 0.3);
+  if (lt >= M.c[2] + 0.3 && !(U.merged && lt > M.btn + 0.45)) { const fly = U.merged ? ease((lt - M.btn - 0.15) / 0.3) : 0, b0 = bar(0); c.globalAlpha = open * (U.merged ? 1 : 0.55 + 0.25 * Math.sin(lt * 10)); icon(U.res, { x: lerp(res.x, b0.x, fly), y: lerp(res.y, b0.y, fly) }, 1 + (U.merged ? 0.2 * (1 - fly) : 0)); c.globalAlpha = open; }
+  if (lt >= M.c[2] + 0.3) { c.font = `700 ${px(13)}px "Pixelify Sans",monospace`; c.fillStyle = '#f0a8ff'; c.fillText('ULTIMATE', res.x, res.y + S2 + px(20)); c.fillStyle = '#f0e2b8'; c.fillText(U.resName, res.x, res.y + S2 + px(38)); }
+  // nút MERGE: sáng lên khi con trỏ rê tới, nhấn xuống lúc bấm
+  const hov = lt > M.btn - 0.35 && lt < M.btn + 0.4, down = lt >= M.btn && lt < M.btn + 0.12, ready = lt >= M.c[2] + 0.3;
+  c.fillStyle = ready ? (hov ? '#3a3216' : '#2a2412') : '#141a17'; c.fillRect(btn.x, btn.y + (down ? px(3) : 0), btn.w, btn.h); c.strokeStyle = ready ? '#d4af37' : '#2a3a30'; c.lineWidth = px(2); c.strokeRect(btn.x, btn.y + (down ? px(3) : 0), btn.w, btn.h);
+  c.textAlign = 'center'; c.font = `800 ${px(18)}px "Pixelify Sans",monospace`; c.fillStyle = ready ? '#f2d675' : '#5a6a60'; c.fillText('MERGE', btn.x + btn.w / 2, btn.y + btn.h / 2 + px(7) + (down ? px(3) : 0)); c.textAlign = 'left';
+  if (U.merged && lt < M.btn + 0.5) { const k = (lt - M.btn) / 0.5; c.globalAlpha = open * (1 - k); c.strokeStyle = '#fff6d0'; c.lineWidth = px(4); c.beginPath(); c.arc(res.x + S2 / 2, res.y + S2 / 2, S2 * (0.6 + k * 1.6), 0, TAU); c.stroke(); c.globalAlpha = open; }
+  // con trỏ chuột: lướt mượt giữa các điểm bấm, nhún xuống + gợn vòng khi bấm
+  const ctr = p => ({ x: p.x + S2 * 0.55, y: p.y + S2 * 0.55 }), keys = [[M.open, { x: x0 + pw * 0.75, y: y0 + ph + px(60) }], [M.c[0], ctr(bar(0))], [M.c[1], ctr(bar(1))], [M.c[2], ctr(bar(2))], [M.btn, { x: btn.x + btn.w * 0.55, y: btn.y + btn.h * 0.6 }], [M.close, { x: btn.x + btn.w * 0.8, y: btn.y + btn.h * 1.6 }]];
+  let cp = keys[0][1]; for (let i = 1; i < keys.length; i++) { const [ta, pa] = keys[i - 1], [tb, pb] = keys[i]; if (lt <= tb) { const k = ease(Math.max(0, (lt - ta - 0.05) / Math.max(0.01, (tb - ta) * 0.62))); cp = { x: lerp(pa.x, pb.x, k), y: lerp(pa.y, pb.y, k) }; break; } cp = pb; }
+  const clicks = [...M.c, M.btn], press = clicks.some(t => lt >= t && lt < t + 0.1), sc = px(3) * (press ? 0.85 : 1);
+  for (const t of clicks) if (lt >= t && lt < t + 0.35) { const k = (lt - t) / 0.35; c.globalAlpha = open * (1 - k); c.strokeStyle = '#ffffff'; c.lineWidth = px(2); c.beginPath(); c.arc(cp.x, cp.y, px(8) + k * px(26), 0, TAU); c.stroke(); c.globalAlpha = open; }
+  CURSOR.forEach((r, j) => [...r].forEach((ch, i) => { if (ch === '.') return; c.fillStyle = ch === 'o' ? '#141013' : '#ffffff'; c.fillRect(Math.round(cp.x + i * sc), Math.round(cp.y + j * sc), Math.ceil(sc), Math.ceil(sc)); }));
+  c.restore();
 }
 function drawWipe(c, W, H) { if (!S.wipe) return; const k = (S.t - S.wipe.t0) / WIPE; if (k >= 1) { S.wipe = null; return; } if (k > 0) wipe(c, W, H, k, S.wipe.kind, S.wipe.dir); }
 function lowerThird(c, [title, sub], t, hold, W, H, px, kicker) {
