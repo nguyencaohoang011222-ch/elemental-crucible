@@ -62,7 +62,7 @@ const U = {
       if (F) clearShots(g, p.x, p.y, 125);
       if (o.tick <= 0) { o.tick = 0.25; hit(g, sk, p.x, p.y, 125, sk.tick); }
       if (o.rock <= 0) { o.rock = 0.28; for (let k = 0; k < 3; k++) g.proj('shard', p.x, p.y, g.rand() * TAU, { speed: 480, range: 300, r: 8, dmg: sk.rock.dmg, burn: F ? 0 : 2.5, wet: F ? 3 : 0, slow: F ? [0.45, 1.2] : undefined, pierce: 1 }, sk); }
-      if (o.t >= o.life - 0.02) { p.ultLift = 0; hit(g, sk, p.x, p.y, 160, sk.land); fx(g, sk, 'bigSlam', { x: p.x, y: p.y, r: 160 }); } } });
+      if (o.t >= o.life - 0.02) { p.ultLift = 0; p.ultSpin = 0; p.z = 0; hit(g, sk, p.x, p.y, 160, sk.land); fx(g, sk, 'bigSlam', { x: p.x, y: p.y, r: 160 }); } } });
   },
   // ================= RANGER =================
   meteorarrow(g, sk, ax, ay) { // gồng → mũi tên khổng lồ, thiên thạch dọc đường (bản rèn: slow motion, 9 thiên thạch, tên tách 3)
@@ -143,7 +143,8 @@ export function updateUlts(g, dt) {
   const p = g.p;
   if (p.ultMove) { const M = p.ultMove; M.t += dt; const k = Math.min(1, M.t / M.T); p.x = M.x0 + (M.x1 - M.x0) * k; p.y = M.y0 + (M.y1 - M.y0) * k; p.vx = p.vy = 0; p.z = M.arc ? Math.sin(k * Math.PI) * M.arc : 0;
     if (k >= 1) { p.ultMove = null; p.z = 0; g.world.collide(p, p.r); if (g.arena) g.clampArena(p, p.r); if (M.onEnd) M.onEnd(); } }
-  if (p.ultLift > 0) { p.ultLift -= dt; p.z = 26 + Math.sin(g.t * 8) * 4; if (p.ultLift <= 0) p.z = 0; }
+  if (p.ultLift > 0) { p.ultLift -= dt; p.z = 26 + Math.sin(g.t * 8) * 4; p._lifted = true; if (p.ultLift <= 0) p.z = 0; }
+  else if (p._lifted) { p._lifted = false; if (!p.ultMove && !p.leap) p.z = 0; }   // lift bị ngắt giữa chừng (chiêu kết thúc gán ultLift = 0): luôn hạ người xuống đất
   for (const k of ['ultSpin', 'hasteT', 'ghostT', 'giant']) if (p[k] > 0) p[k] = Math.max(0, p[k] - dt);
   for (const e of g.enemies) { if (e.airT > 0) e.airT -= dt; if (e.markT > 0) e.markT -= dt; }
   for (const o of g.ults) { o.t += dt; g._quietHit = !!o.quiet; try { o.update(g, dt, o); } finally { g._quietHit = false; } }

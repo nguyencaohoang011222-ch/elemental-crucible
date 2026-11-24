@@ -33,6 +33,17 @@ for (const forged of [false, true]) for (const { cls, set, d } of all) {
   ok(g.enemies.filter(e => e.hp < 4000).length >= 5, 'Monsoon Dance strikes 5 different foes'); }
 { const g = new Game(5, 'KNIGHT', { training: true, lab: true }); g.p.energy = 999; g.castNow(g.coreSkill({ type: 'tri', els: ['EARTH', 'FIRE', 'WATER'] }), g.p.x + 100, g.p.y); g.step(1 / 60, {});
   const hp0 = g.p.hp; g.hurtPlayer(40, 0, { boss: true }); ok(g.p.giant > 0 && hp0 - g.p.hp <= 20 * g.diff.dmg + 0.01, 'Mountain Titan: giant form halves damage taken'); }
+// mọi tuyệt kỹ (thường + rèn) xong là nhân vật đứng lại trên mặt đất, hết khổng lồ/bay (lỗi cũ: Sunder để người treo lơ lửng)
+{ const bad = [];
+  for (const forged of [false, true]) for (const { cls, set, d } of all) {
+    const g = new Game(6, cls, { training: true, lab: true }); g.labGod = true; g.enemies = [];
+    for (let i = 0; i < 4; i++) g.spawnAt('GRUNT', g.p.x + 160 + i * 50, g.p.y); for (const e of g.enemies) { e.spawn = 0; e.hp = e.max = 9000; }
+    if (forged) g.p.forged.add(d.key);
+    const sk = g.coreSkill({ type: 'tri', els: set.slice() }); g.p.energy = 999; g.castNow(sk, g.p.x + 200, g.p.y);
+    for (let i = 0; i < 60 * 10; i++) g.step(1 / 60, { ax: g.p.x + 200, ay: g.p.y });
+    const p = g.p; if (p.z !== 0 || p.ultLift > 0 || p.giant > 0 || p.ultMove || p.leap) bad.push(`${forged ? 'forged ' : ''}${d.name} z=${p.z.toFixed(1)}`);
+  }
+  ok(bad.length === 0, 'every ultimate (normal + forged) ends with the hero back on the ground' + (bad.length ? ' — stuck: ' + bad.join(', ') : '')); }
 
 // ---------- hệ phòng thủ trong trận boss thật ----------
 const bossGame = (cls, stage = 20) => { const g = new Game(11, cls); g.startStage(stage); for (let i = 0; i < 120; i++) g.step(1 / 60, {}); return g; };
