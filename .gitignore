@@ -6,3 +6,9 @@ node_modules/
 shots/
 .DS_Store
 Thumbs.db
+
+# marketing: clip thô, cache và video thành phẩm (nặng, tạo lại được)
+marketing/raw_clips/
+marketing/output/
+marketing/.cache/
+__pycache__/

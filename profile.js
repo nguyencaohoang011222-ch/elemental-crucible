@@ -105,6 +105,9 @@ export function save() { try { store && store.setItem(KEY, JSON.stringify(P)); }
 export function reset() { P = fresh(); save(); }
 // thay toàn bộ hồ sơ bằng bản lưu trên mây (đồng bộ tài khoản)
 export function replace(obj) { P = Object.assign(fresh(), obj || {}); save(); }
+// lượt chơi đang dở (bản chụp từ runsave.js), đi theo hồ sơ nên cũng được đồng bộ lên tài khoản
+export function saveRun(snap) { P.run = snap; save(); }
+export function clearRun() { if (!P.run) return; delete P.run; save(); }
 export function addGems(n, why) { if (!(n > 0)) return; P.gems += n; save(); for (const f of subs) f(P, { gems: n, why }); }
 export function spend(n) { if (P.gems < n) return false; P.gems -= n; save(); return true; }
 

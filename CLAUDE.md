@@ -41,3 +41,9 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - **No scrollbars on main screens and modals.** Content must fit; only long lists (leaderboard, guide sections) may scroll inside a bounded panel.
 - Reuse the existing look: `.box` modals, `.tabs.seg` tabs, `var(--gold)` headings, `'Pixelify Sans'` font, `clip-path: var(--px-step2)` bevelled corners.
 - UI text is English; code comments may be Vietnamese.
+
+## Run save (Continue)
+
+- `runsave.js`: `Game.finishReward` calls `g.onStageSave(n)` right before `startStage(n)`; `main.js` stores `snapshotRun(g, n)` in the profile as `PR.P.run`, so it goes to localStorage and syncs to the account (Supabase `saves`) like the rest of the profile. `restoreRun` builds a new `Game` from the same seed and enters stage `n`.
+- The save is deleted on death or victory (`showEnd` / `showVictory`) and when a new run starts. Quit to Title from the pause menu keeps it. Training, Test Lab and the trailer never save.
+- When you add new run state to `Game` or `p` (a new counter, a Set), add it to `G_KEYS` / `P_KEYS` in `runsave.js` and to `tests/runsave.mjs`.

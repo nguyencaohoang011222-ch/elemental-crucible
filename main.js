@@ -23,12 +23,13 @@ import * as FG from './forge.js';
 import * as RL from './relics.js';
 import * as ON from './online.js';
 import * as TM from './mobile.js';
-import { startTrailer, stopTrailer, trailerFrame, toggleCaptions, trailerTime, renderTrailerAudio } from './trailer.js';
+import { startTrailer, stopTrailer, trailerFrame, toggleCaptions, trailerTime, renderTrailerAudio, renderTrailerMusic, trailerClipList } from './trailer.js';
 import { forgeInfo } from './forgeups.js';
 import { MINOR_BY_ID } from './upgrades.js';
 import { STAT_DROPS } from './game.js';
 import { coreDef } from './kits.js';
 import { smithSprite } from './gfx/forge.js';
+import { snapshotRun, restoreRun, validRun } from './runsave.js';
 
 const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
@@ -66,9 +67,24 @@ function ensureAudio() { AU.ensure(); }
 addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensureAudio);
 
 function startRun(cfg) {
-  ensureAudio(); runCfg = { ...cfg }; isTraining = false;
+  ensureAudio(); runCfg = { ...cfg }; isTraining = false; PR.clearRun();
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { element: cfg.element, difficulty: cfg.difficulty, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
-  enterPlay();
+  hookRunSave(game); enterPlay();
+}
+// ---------- lưu tiến trình lượt chơi: tự lưu mỗi khi qua stage, tắt tab mở lại vẫn Continue được ----------
+function hookRunSave(g) { g.onStageSave = n => { if (g !== game || isTraining || g.lab) return; PR.saveRun(snapshotRun(g, n)); pushNow(); }; }
+const savedRun = () => validRun(PR.P.run) && CLASSES[PR.P.run.cls] ? PR.P.run : null;
+function continueRun() {
+  const s = savedRun(); if (!s) { renderContinue(); return; }
+  ensureAudio(); isTraining = false; runCfg = { ...runCfg, cls: s.cls, difficulty: s.difficulty || 'NORMAL' };
+  try { game = restoreRun(s, { skin: PR.skinOf(s.cls), skinFx: PR.skinFx(s.cls, PR.skinOf(s.cls)) }); }
+  catch (e) { console.warn('runsave: không khôi phục được', e); PR.clearRun(); renderContinue(); showHint('Your saved run could not be loaded.', 4); return; }
+  hookRunSave(game); enterPlay(); showHint('Run restored: stage ' + s.stage + '.', 3);
+}
+function renderContinue() {
+  const s = savedRun(), b = $('contbtn'), nb = document.querySelector('.tbtn[data-act="newrun"]'); if (!b) return;
+  b.classList.toggle('hidden', !s); if (nb) nb.classList.toggle('hero', !s);
+  if (s) b.querySelector('small').textContent = 'Stage ' + s.stage + ' · ' + CLASSES[s.cls].name + (s.difficulty === 'HARD' ? ' · Hard' : '');
 }
 function startTraining(cls) {
   ensureAudio(); isTraining = true;
@@ -408,14 +424,14 @@ function toTitle() {
   showLab(false); $('labstrip').classList.add('hidden');
   for (const m of [...modals]) closeModal(m);
   game = new Game(7, 'KNIGHT', { training: true }); R.reset(); ui = 'title';
-  $('hud').classList.add('hidden'); $('title').classList.add('on');
+  $('hud').classList.add('hidden'); $('title').classList.add('on'); renderContinue();
 }
 // ---------- Trailer Director (T ở màn hình chính) ----------
-function runTrailer(record) {
+function runTrailer(record, extra) {
   ensureAudio(); AU.music(null); for (const m of [...modals]) closeModal(m);
   $('title').classList.remove('on'); $('hud').classList.add('hidden');
   startTrailer({ R, SFX, audioCtx: () => AU.ensure(), setGame: g => { game = g; }, setUi: u => { ui = u; }, toTitle,
-    bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } }, { record: !!record });
+    bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } }, { record: !!record, ...(extra || {}) });
 }
 function pause() {
   if (ui !== 'play') return; ui = 'pause'; resetInput();
@@ -436,7 +452,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act],[data-close]'); if (!b) return;
   if (b.hasAttribute('data-close')) { closeModal(b.closest('.screen').id); return; }
   const act = b.dataset.act; ensureAudio(); if ((act === 'quit' || act === 'restart') && ui === 'end' && !isTraining && !game.gemsPaid) game.gemsPaid = runEndedOnline(game.stage, game.won, game.p.cls); if (act === 'restart' && game.lab) { startLab(labCfg); return; } if (SFX.ui) SFX.ui();
-  if (act === 'newrun') openNewRun();
+  if (act === 'newrun') { if (savedRun()) confirmBox('Start a new run?', 'Your saved run (stage ' + savedRun().stage + ') will be lost.', () => { PR.clearRun(); openNewRun(); }); else openNewRun(); }
+  else if (act === 'continue') continueRun();
   else if (act === 'lab') startLab(labCfg);
   else if (act === 'shop') openShop();
   else if (act === 'daily') openDaily();
@@ -446,7 +463,7 @@ document.addEventListener('click', e => {
   else if (act === 'controls') { renderControls(); openModal('controls'); }
   else if (act === 'resume') resume();
   else if (act === 'restart') { if (ui === 'end') { closeModal('end'); closeModal('victory'); if (isTraining) startTraining(); else openNewRun(); } else confirmBox('Restart?', 'This run will be lost.', () => isTraining ? startTraining() : startRun(runCfg)); }
-  else if (act === 'quit') { if (ui === 'end') toTitle(); else confirmBox('Quit to title?', 'This run will be lost.', toTitle); }
+  else if (act === 'quit') { if (ui === 'end') toTitle(); else { const s = !isTraining && savedRun(); confirmBox('Quit to title?', s ? 'Progress is saved at the start of stage ' + s.stage + '. Pick Continue on the title screen to resume.' : 'This run will be lost.', toTitle); } }
 });
 $('pausebtn').onclick = () => pause();
 $('bagbtn').onclick = () => openBag();
@@ -955,7 +972,7 @@ function groupBuild(log) {
     : '<span class="eup">' + PXI('sparkle', 14) + o.name + (o.n > 1 ? ' <em>×' + o.n + '</em>' : '') + '</span>').join('');
 }
 function showVictory() {
-  ui = 'end'; const g = game; if (SFX.victory) SFX.victory(); else if (SFX.bossDown) SFX.bossDown();
+  ui = 'end'; const g = game; if (SFX.victory) SFX.victory(); else if (SFX.bossDown) SFX.bossDown(); if (!isTraining) PR.clearRun();
   if (!isTraining && !g.gemsPaid) g.gemsPaid = runEndedOnline(g.stage, true, g.p.cls, g.difficulty);
   const R0 = g.gemsPaid || { gems: 0, bonus: [], unlocks: [], ach: [] }, cls = g.p.cls, tm = Math.floor(g.t);
   $('vsub').innerHTML = '<b>' + CLASSES[cls].name + '</b> broke all five titans' + (g.difficulty === 'HARD' ? '<span class="hard">HARD</span>' : '');
@@ -974,7 +991,7 @@ function showVictory() {
 }
 function showEnd() {
   if (game.won) return showVictory();
-  ui = 'end'; const g = game, won = g.won; if (!won && SFX.dead) SFX.dead();
+  ui = 'end'; const g = game, won = g.won; if (!won && SFX.dead) SFX.dead(); if (!isTraining) PR.clearRun();
   $('endt').textContent = won ? 'The Titans Have Fallen' : 'You Have Fallen'; $('endt').style.color = won ? 'var(--gold)' : 'var(--bad)';
   $('ends').textContent = won ? `${CLASSES[g.p.cls].name} conquered all ${LAST_STAGE} stages${g.difficulty === 'HARD' ? ' on Hard' : ''}.` : `${CLASSES[g.p.cls].name} fell on stage ${g.stage}${g.boss ? ' to ' + g.boss.def.name : ''}.`;
   const m = Math.floor(g.t / 60), s = Math.floor(g.t % 60);
@@ -1050,7 +1067,7 @@ window.__ea = {
   frames: n => { for (let i = 0; i < n; i++) frame(last + 1000 / 60, true); },
   press: code => { window.dispatchEvent(new KeyboardEvent('keydown', { code })); window.dispatchEvent(new KeyboardEvent('keyup', { code })); },
   shot: async n => fetch('/save/' + n, { method: 'POST', body: cv.toDataURL('image/png') }).then(r => r.text()),
-  trailer: { start: record => runTrailer(record), time: trailerTime, audio: renderTrailerAudio }
+  trailer: { start: (record, extra) => runTrailer(record, extra), time: trailerTime, audio: renderTrailerAudio, music: renderTrailerMusic, clips: trailerClipList }
 };
 requestAnimationFrame(frame);
 TM.initMobile({ SET, game: () => game, slot: i => { if (ui === 'play' && !modals.length) slotQ.push(i); }, dash: () => { if (ui === 'play' && !modals.length) dashQ = true; }, potion: k => { if (ui === 'play' && !modals.length) potQ = k; } });
@@ -1101,7 +1118,10 @@ async function syncProfile(s) {
   lsSet('ea-cloud-user', s.user.id);
   if (!s.nick) openNick();
 }
-PR.onChange(() => { if (!syncUser) return; clearTimeout(pushT); pushT = setTimeout(async () => { if (await ON.pushSave(PR.P)) lsSet('ea-cloud-at', new Date().toISOString()); }, 2500); });
+async function pushNow() { if (!syncUser) return; clearTimeout(pushT); pushT = 0; if (await ON.pushSave(PR.P)) lsSet('ea-cloud-at', new Date().toISOString()); }
+PR.onChange(() => { if (!syncUser) return; clearTimeout(pushT); pushT = setTimeout(pushNow, 2500); if (ui === 'title') renderContinue(); });
+addEventListener('pagehide', () => { if (pushT) pushNow(); });
+renderContinue();
 const fmtTime = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 async function openLeader() {
   openModal('leader'); const B = $('lbody'); B.innerHTML = '<p class="sub">Loading…</p>';

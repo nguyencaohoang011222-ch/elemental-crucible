@@ -8,6 +8,7 @@ import * as PR from './profile.js';
 import { ROSTER } from './env.js';
 import { TrailerAudio, wavDataURL, DROP, BEAT } from './trailerAudio.js';
 import { iconSkill } from './gfx/icons.js';
+import { RELIC_BY_ID } from './relics.js';
 
 const DT = 1 / 60, TAU = Math.PI * 2;
 const ease = k => k < 0 ? 0 : k > 1 ? 1 : k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;   // easeInOutCubic
@@ -37,7 +38,7 @@ function mk(cls, skin, stage, seed) {
   g.labGod = true; g.labEnergy = true; g.labShards = true;
   if (stage > 1) g.startStage(stage);
   A.R.reset(); A.R.camTarget = null; A.R.banner = null;
-  const dir = S.whipDir || 1; A.R.camX = g.p.x - dir * 320; A.R.camY = g.p.y;   // vào cảnh với đà lia từ phía vệt quét
+  const dir = S.clips ? 0 : (S.whipDir || 1); A.R.camX = g.p.x - dir * 320; A.R.camY = g.p.y;   // vào cảnh với đà lia từ phía vệt quét
   A.setGame(g); S.g = g; S.bot = { atk: 0, cast: 0.5, ci: 0, dash: 2, side: 1, sideT: 0, clutch: false };
   return g;
 }
@@ -147,11 +148,37 @@ function shots() {
   return L;
 }
 
+// ---------- chế độ ghi clip thô cho reels (9:16, không chữ): mỗi cảnh một tag ----------
+function relicUp(g, ids) { for (const id of ids) { const r = RELIC_BY_ID[id]; if (r) { r.apply(g.p.mods, g); g.p.relics && g.p.relics.add(id); } } if (g.refreshStats) g.refreshStats(); }
+function clipShots() {
+  const L = [], add = (tag, dur, o) => { L.push({ tag, dur, wipe: null, cap: null, ...o }); };
+  const crowdScene = (cls, skin, stage, seed, n, r) => () => { const g = mk(cls, skin, stage, seed); g.enemies = []; g.spawnQ = []; g.p.cores = CORES(false); ring(g, n, r); ff(g, 0.2); };
+  add('horde', 6, { setup: crowdScene('KNIGHT', 'dragonknight', 2, 501, 20, 420), tick: lt => lt > 2 && lt < 2.04 ? { dash: true } : {}, cam: lt => ({ zoom: lerp(1.15, 0.95, ease(lt / 2)) }) });
+  add('dash', 6, { setup: crowdScene('RANGER', 'shadow', 7, 502, 16, 300), tick: lt => (lt % 0.9) < 0.02 ? { dash: true } : {}, cam: () => ({ zoom: 1.0 }) });
+  add('ult', 6, { setup: () => { crowdScene('MAGE', 'inferno', 8, 503, 18, 280)(); S.g.p.cores = CORES(true); }, tick: lt => { const c = crowd(S.g); return (lt % 1.6) < 0.02 && c ? { slots: [0], aim: c, noFire: true } : { noCast: true }; }, cam: () => ({ zoom: 0.95 }) });
+  add('merge', 6.5, { ...shots()[1], cap: null });
+  for (const [tag, st, cls, sk] of [['boss_colossus', 5, 'KNIGHT', 'gold'], ['boss_behemoth', 10, 'RANGER', 'starlight'], ['boss_warden', 15, 'MAGE', 'frostbound'], ['boss_ignivar', 20, 'KNIGHT', 'ignivar'], ['boss_sovereign', 25, 'MAGE', 'stormcrown']])
+    add(tag, 6, { ...bossShot(0, 6, st, cls, sk, 7000 + st, { ultAt: 4.4 }), cap: null, boss: true });
+  const morphs = (cls, list, stage, seed) => ({ setup() { crowdScene(cls, list[0], stage, seed, 12, 240)(); S.mi = 0; }, tick(lt) { const k = Math.floor(lt / 1.4); if (k > S.mi && k < list.length) { S.mi = k; morph(cls, list[k]); } return lt % 1.4 < 0.7 ? { charge: true } : {}; }, cam: () => ({ zoom: 1.2 }) });
+  add('skin', 6, morphs('KNIGHT', ['', 'dragonknight', 'ignivar', 'obsidian', 'titanslayer'], 3, 504));
+  add('skin', 6, morphs('MAGE', ['', 'celestial', 'stormcrown', 'frostbound', 'void'], 12, 505));
+  add('skin', 6, morphs('RANGER', ['', 'starlight', 'shadow', 'frost', 'titanslayer'], 17, 506));
+  add('knight_parry', 6, { setup() { const g = mk('KNIGHT', 'dragonknight', 3, 507); g.enemies = []; g.spawnQ = []; g.p.cores = CORES(false); g.p.mods.deflect = 2; for (let i = 0; i < 9; i++) g.spawnEnemy('SHOOTER', i / 9 * TAU, 300); ff(g, 0.2); }, tick: () => ({ noDash: true, noCast: true }), cam: () => ({ zoom: 1.15 }) });
+  add('ranger_focus', 6, { setup: crowdScene('RANGER', 'starlight', 4, 508, 16, 360), tick: lt => (lt % 1.8) < 1.35 ? { charge: true, noCast: true } : { noCast: true }, cam: () => ({ zoom: 1.0 }) });
+  add('mage_blackhole', 6, { setup() { crowdScene('MAGE', 'celestial', 6, 509, 18, 300)(); relicUp(S.g, ['blackhole']); }, tick: lt => (lt % 2.0) < 1.6 ? { charge: true, noCast: true, aim: crowd(S.g) } : { noCast: true, aim: crowd(S.g) }, cam: () => ({ zoom: 0.95 }) });
+  add('relic', 6, { setup() { crowdScene('MAGE', 'void', 9, 510, 18, 280)(); relicUp(S.g, ['echo', 'gravity', 'overload', 'spellblade']); }, tick: lt => (lt % 0.5) < 0.02 ? { slots: [Math.floor(lt / 0.5) % 4] } : {}, cam: () => ({ zoom: 1.0 }) });
+  let t = 0; for (const c of L) { c.t0 = t; t += c.dur; }
+  return L;
+}
+export function trailerClipList() { return clipShots().map(c => ({ tag: c.tag, t0: c.t0, dur: c.dur })); }
+
 // ---------- vòng chạy ----------
 export function startTrailer(api, opts = {}) {
   A = api; if (!LOGO) { LOGO = new Image(); LOGO.src = 'icons/logo-480.png'; }
-  S = { t: 0, i: -1, list: shots(), acc: 0, slowT: 0, slowScale: 1, punch: 1, punchT: 0, flash: 0, zoom: 1.4, caps: true, wipe: null, rec: opts.record ? { cues: [], slows: [] } : null, au: null, hits: 0, kills: 0, hz: 0, haz: 0 };
+  const clips = !!opts.clips, list = clips ? clipShots() : shots();
+  S = { clips, endAt: clips ? list[list.length - 1].t0 + list[list.length - 1].dur : END_AT, titleAt: clips ? Infinity : TITLE_AT, zoomMul: opts.portrait ? 0.56 : 1, t: 0, i: -1, list, acc: 0, slowT: 0, slowScale: 1, punch: 1, punchT: 0, flash: 0, zoom: 1.4, caps: true, wipe: null, rec: opts.record ? { cues: [], slows: [] } : null, au: null, hits: 0, kills: 0, hz: 0, haz: 0 };
   // âm thanh trực tiếp: dùng chung AudioContext của game (đã mở khoá bằng phím T), đồng hồ phim chạy theo đồng hồ âm thanh
+  if (clips) S.caps = false;
   if (!S.rec && api.audioCtx) { const ac = api.audioCtx(); if (ac) { S.au = new TrailerAudio(ac, ac.destination, ac.currentTime + 0.06); S.au.music({ cut: FLASH_AT, slam: SLAM_AT, end: END_AT }); S.ac = ac; } }
   A.setUi('trailer'); document.body.classList.add('trailer');
 }
@@ -168,13 +195,13 @@ export function trailerFrame(dt) {
   if (!S) return; const R = A.R;
   if (S.au && S.ac && S.ac.state === 'running') { const t = S.ac.currentTime - S.au.t0; dt = Math.max(0, Math.min(0.1, t - S.t)); }
   S.t += dt;
-  if (S.t >= END_AT) { stopTrailer(); return; }
+  if (S.t >= S.endAt) { stopTrailer(); return; }
   const nx = S.list[S.i + 1];
   // vệt quét bắt đầu trước điểm cắt WIPE/2, kèm đà lia camera theo hướng quét
   if (nx && nx.wipe && !S.wipe && S.t >= nx.t0 - WIPE / 2) { S.whipDir = nx.wipe === 'whip' ? -(S.whipDir || 1) : 1; S.wipe = { kind: nx.wipe, t0: nx.t0 - WIPE / 2, dir: S.whipDir }; sfx('whoosh'); }
   if (nx && S.t >= nx.t0) { S.i++; S.cur = nx; S.ultCast = false; S.flashed = false; S.paused = false; S.slowT = 0; S.punchT = 0; nx.setup(); }
   const sh = S.cur; if (!sh) return;
-  const lt = S.t - sh.t0, inTitle = S.t >= TITLE_AT;
+  const lt = S.t - sh.t0, inTitle = S.t >= S.titleAt;
   let ts = 1; if (S.slowT > 0) { S.slowT -= dt; ts = S.slowScale; }
   const force = inTitle ? { noFire: true, noCast: true, noDash: true, hold: true, noDodge: true } : (sh.tick(lt, dt) || {});
   const g = S.g;
@@ -186,7 +213,7 @@ export function trailerFrame(dt) {
   // camera: mục tiêu + zoom của cảnh, đẩy cận khi quay chậm, đà lia khi chuyển cảnh
   const c = sh.cam(lt) || {}; let zoom = c.zoom || 1;
   if (S.punchT > 0) { S.punchT -= dt; zoom *= lerp(1, S.punch, Math.min(1, S.punchT / 0.2)); }
-  S.zoom += (zoom - S.zoom) * Math.min(1, dt * 7); R.camZoom = S.zoom;
+  S.zoom += (zoom - S.zoom) * Math.min(1, dt * 7); R.camZoom = S.zoom * (S.zoomMul || 1);
   let tg = S.punchT > 0 && S.punchAt ? { x: S.punchAt.x, y: S.punchAt.y, k: 9 } : c.target || null;
   if (nx && nx.wipe && S.t > nx.t0 - WIPE / 2) { const k = ease((S.t - (nx.t0 - WIPE / 2)) / (WIPE / 2)), base = tg || { x: g.p.x, y: g.p.y }; tg = { x: base.x + (S.whipDir || 1) * 420 * k, y: base.y, k: 14 }; }
   R.camTarget = tg; R.banner = null; R.castText = null;
@@ -196,6 +223,10 @@ export function trailerFrame(dt) {
 }
 
 // ---------- xuất video: nhạc + SFX dựng lại offline theo đúng các mốc đã ghi ----------
+export async function renderTrailerMusic() {
+  const sr = 44100, oc = new OfflineAudioContext(2, Math.ceil(sr * END_AT), sr), au = new TrailerAudio(oc, oc.destination, 0);
+  au.music({ cut: FLASH_AT, slam: SLAM_AT, end: END_AT }); return wavDataURL(await oc.startRendering());
+}
 export async function renderTrailerAudio() {
   const rec = lastRec || (S && S.rec); if (!rec) return null;
   const sr = 44100, oc = new OfflineAudioContext(2, Math.ceil(sr * END_AT), sr), au = new TrailerAudio(oc, oc.destination, 0);
@@ -209,7 +240,7 @@ export async function renderTrailerAudio() {
 function overlay(c, R, dt, lt, sh, inTitle) {
   const W = R.W, H = R.H, k = H / Math.max(1, innerHeight), px = v => Math.round(v * k);
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.imageSmoothingEnabled = false;
-  if (inTitle) { titleCard(c, W, H, S.t - TITLE_AT, px); drawWipe(c, W, H); return; }
+  if (inTitle) { titleCard(c, W, H, S.t - S.titleAt, px); drawWipe(c, W, H); return; }
   if (sh.final && S.t > FLASH_AT + 0.15) { c.globalAlpha = Math.min(1, (S.t - FLASH_AT - 0.15) / 0.6); c.fillStyle = '#0b0f0d'; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
   if (S.flash > 0) { c.globalAlpha = Math.min(1, S.flash); c.fillStyle = '#f4fbff'; c.fillRect(0, 0, W, H); c.globalAlpha = 1; S.flash = Math.max(0, S.flash - dt * 2.4); }
   if (sh.merge && S.mui) mergeUI(c, W, H, lt, px);

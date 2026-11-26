@@ -839,7 +839,7 @@ export class Game extends Sim {
   rerollReward(paid) { const r = this.rewards[0]; if (!r) return false; if (paid) this.paidRerolls++; else if (this.rerolls > 0) this.rerolls--; else return false; r.choices = r.type === 'minor' ? rollMinor(this) : rollMajor(this); this.emit('reroll', {}); return true; }
   // hồi sinh (1 lần mỗi lượt): nửa máu, 2.5 giây bất tử, dọn đòn đang bay
   revive() { if (this.revived) return false; const p = this.p; this.revived = true; this.over = false; p.hp = p.max * 0.5; p.inv = 2.5; p.frozen = 0; p.rooted = 0; this.hazards = []; this.foes = []; this.emit('revive', { x: p.x, y: p.y }); return true; }
-  finishReward() { this.rewards.shift(); if (!this.rewards.length) this.startStage(this.stage + 1); }
+  finishReward() { this.rewards.shift(); if (!this.rewards.length) { const n = this.stage + 1; if (this.onStageSave) this.onStageSave(n); this.startStage(n); } }   // onStageSave: main chụp bản lưu lượt chơi ngay trước khi vào stage mới
   pickMinor(id) {
     if (id && id.startsWith('core:')) { const el = id.slice(5); this.addCore({ type: 'el', el }); this.upgradeLog.push('Core ' + el); this.finishReward(); return; }
     const u = MINOR_BY_ID[id];

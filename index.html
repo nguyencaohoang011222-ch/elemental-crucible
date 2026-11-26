@@ -166,6 +166,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tbtn svg{flex:none;color:#9aa09d;transition:color .15s,transform .2s}
 .tbtn:hover,.tbtn:focus{outline:none;transform:translateY(-2px);border-color:#d4af3799;color:#fff;background:#1a2a24dd;box-shadow:0 6px 18px #0009}.tbtn:hover svg,.tbtn:focus svg{color:#d4af37;transform:scale(1.12)}
 .tbtn.hero{height:56px;font-size:17px;letter-spacing:.14em;color:#f2d675;border-color:#d4af37;background:linear-gradient(#2e2712,#201b0c);box-shadow:0 0 18px #d4af3730,inset 0 0 16px #d4af3718}
+.tbtn small{display:block;margin-top:2px;font:600 10px 'Pixelify Sans',monospace;letter-spacing:.06em;color:#c9b67a;text-transform:none}.tbtn span:has(small){line-height:1.05}
 .tbtn.hero svg{color:#d4af37}.tbtn.hero:hover{box-shadow:0 0 28px #d4af3766,inset 0 0 20px #d4af3730;color:#fff1b0}
 .ndot{display:none;position:absolute;right:16px;top:50%;width:9px;height:9px;margin-top:-4.500px;border-radius:50%;background:#38bdf8;box-shadow:0 0 0 0 #38bdf8aa;animation:ndot 1.8s infinite}.ndot.on{display:block}
 @keyframes ndot{0%{box-shadow:0 0 0 0 #38bdf8aa}70%{box-shadow:0 0 0 9px #38bdf800}100%{box-shadow:0 0 0 0 #38bdf800}}
@@ -639,6 +640,7 @@ body.touch #hint{bottom:auto;top:64px}
 <div id="title" class="screen on"><div>
   <div class="logo">ELEMENTAL ARENA</div><div class="tag">Merge the elements. Break the titans.</div>
   <div class="tmenu">
+    <button class="tbtn hero hidden" data-act="continue" id="contbtn"><i data-px="play" data-size="22"></i><span>Continue<small></small></span></button>
     <button class="tbtn hero" data-act="newrun"><i data-px="play" data-size="22"></i><span>New Run</span></button>
     <button class="tbtn" data-act="lab"><i data-px="wrench" data-size="20"></i><span>Test Lab</span></button>
     <button class="tbtn" data-act="shop"><i data-px="gem" data-size="20"></i><span>Shop &amp; Skins</span></button>
