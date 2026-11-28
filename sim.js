@@ -238,7 +238,7 @@ export class Sim {
       if (c >= 0.35 && M.swordWave) { const n = c >= 0.95 || M.swordWave > 1 ? 3 : 1; for (let k = 0; k < n; k++) this.shoot({ kind: 'wave', dmg: (10 + 22 * c) * (M.swordWave > 1 ? 1.3 : 1), speed: 720, life: 0.55, r: 16 * sz, pierce: 99, kb: 220, off: (k - (n - 1) / 2) * 0.32, noRecoil: true }); }
       if (c >= 0.95 && M.quakeWave) this.shoot({ kind: 'wave', dmg: dmg * 0.6, speed: 700, life: 360 / 700, r: 26 * sz, pierce: 99, kb: 260, noRecoil: true });   // Shockwave Mastery
       let hits = 0; const hit = new Set();
-      for (const e of this.enemies) {
+      for (const e of (this._bladeThrow ? [] : this.enemies)) {   // Boomerang Blade: kiếm đã bay đi, nhát cận chiến không trúng ai
         const d = dist(p.x, p.y, e.x, e.y); if (d > reach + e.r) continue;
         if (Math.abs(angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc / 2 + e.r / Math.max(d, 1)) continue;
         this.hurtEnemy(e, dmg, p.aim, kb, 'slash'); hits++; hit.add(e);

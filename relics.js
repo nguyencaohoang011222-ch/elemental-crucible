@@ -81,10 +81,10 @@ const near = (g, x, y, R, skip) => { let best = null, bd = R; for (const e of g.
 // quanh đòn thường: trả về 'block' (không được đánh) hoặc hàm dọn dẹp chạy sau khi đánh
 export function relicBasic(g, c, attack) {
   const p = g.p, M = p.mods, fx = g.relicFx || (g.relicFx = []);
+  let throwBlade = false;
   if (M.boomerang && p.cls === 'KNIGHT') {
     if (fx.some(f => f.type === 'blade')) return;                                            // kiếm đang bay: không chém được
-    if (c >= 0.97) { const dmg = (12 + 44 * c) * (p.basicMul || 1) * 0.8;
-      fx.push({ type: 'blade', x: p.x, y: p.y, a: p.aim, out: true, d: 0, dmg, hit: new Set(), spin: 0 }); p.atkT = 0.3; g.emit('bladeThrow', { x: p.x, y: p.y }); return; }
+    throwBlade = c >= 0.97;   // tụ đầy: ném kiếm, nhưng vẫn chạy đủ nhát tụ (sóng đẩy lùi, Sword Wave, Shockwave, relic khác) — chỉ nhát chém cận chiến được thay bằng kiếm bay
   }
   if (M.bloodPact && p.hp > 15) p.hp = Math.max(15, p.hp - 1);
   const undo = [], n0 = g.shots.length;
@@ -97,7 +97,9 @@ export function relicBasic(g, c, attack) {
   // static: xả sét
   if (M.static && (p.static || 0) >= 5) { let k = Math.floor(p.static / 5), px = p.x, py = p.y; const done = new Set(); p.static = 0;
     while (k-- > 0) { const e = near(g, px, py, done.size ? 170 : 260, done); if (!e) break; done.add(e); g.emit('chain', { x1: px, y1: py, x2: e.x, y2: e.y }); g.hurtEnemy(e, 6 * (M.dmg || 1), Math.atan2(e.y - py, e.x - px), 80, 'zap'); px = e.x; py = e.y; } }
-  attack();
+  if (throwBlade) { const dmg = (12 + 44 * c) * (p.basicMul || 1) * 0.8;   // tính sau Spellblade / Unstable để kiếm bay cũng được cộng
+    fx.push({ type: 'blade', x: p.x, y: p.y, a: p.aim, out: true, d: 0, dmg, hit: new Set(), spin: 0 }); g.emit('bladeThrow', { x: p.x, y: p.y }); g._bladeThrow = true; }
+  try { attack(); } finally { g._bladeThrow = false; }
   // tên / cầu vừa bắn ra
   const made = g.shots.slice(n0);
   for (const s of made) {

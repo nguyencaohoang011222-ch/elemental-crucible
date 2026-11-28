@@ -13,15 +13,15 @@ export const BOSS_DEFS = [
   { id: 'BEHEMOTH', name: 'Sporeback Behemoth', epithet: 'The Walking Grove', hp: 6500, r: 70, speed: 68, range: 170, dmg: 1.15, poise: 170, color: '#d4b46e', accent: '#ff9a4a',
     phases: [{ at: 1, moves: ['slam', 'sporecone', 'roots', 'burrow', 'shellricochet'] },
              { at: 0.5, moves: ['brood', 'sporequake', 'mycelium', 'burrow', 'shellricochet', 'toxicspit'], speed: 1.25, wind: 0.8, terra: 'POISON' }] },
-  { id: 'SOVEREIGN', name: 'Storm Sovereign', epithet: 'Crown of Every Element', hp: 20000, r: 54, speed: 119, range: 200, dmg: 1.7, poise: 260, color: '#c9a8ff', accent: '#7fe0ff',
+  { id: 'SOVEREIGN', name: 'Storm Sovereign', epithet: 'Crown of Every Element', hp: 20000, r: 54, speed: 119, range: 200, dmg: 1.7, poise: 380, idleMul: 0.6, staggerMul: 0.55, color: '#c9a8ff', accent: '#7fe0ff',
     phases: [{ at: 1, moves: ['vortex', 'stormbeams', 'lines', 'teleport', 'constellation'] },
              { at: 0.66, moves: ['vortex2', 'stormbeams', 'lines', 'teleport', 'constellation'], speed: 1.2, wind: 0.85 }, // phase 2: lốc mạnh hơn; phân thân chỉ từ phase 3
              { at: 0.33, moves: ['vortex2', 'stormbeams', 'lines', 'teleport', 'mirror', 'constellation'], speed: 1.35, wind: 0.75, storm: true }] }
 ];
-BOSS_DEFS.push({ id: 'DRAGON', name: 'Ignivar', epithet: 'The Last Flame', hp: 15000, r: 66, speed: 108, range: 240, dmg: 1.55, poise: 210, color: '#ff5a1a', accent: '#ffd36b', tele: '#ff3a10',
-  phases: [{ at: 1, moves: ['breath', 'tail', 'gust', 'dive'] },
-           { at: 0.8, moves: ['breath', 'tail', 'skyfall', 'hellspiral', 'dive'], speed: 1.15, wind: 0.85, terra: 'LAVA' },
-           { at: 0.4, moves: ['breath', 'infernodive', 'lastflame', 'skyfall', 'tail'], speed: 1.3, wind: 0.75, firestorm: true }] });
+BOSS_DEFS.push({ id: 'DRAGON', name: 'Ignivar', epithet: 'The Last Flame', hp: 15000, r: 66, speed: 108, range: 240, dmg: 1.55, poise: 330, idleMul: 0.6, staggerMul: 0.55, color: '#ff5a1a', accent: '#ffd36b', tele: '#ff3a10',
+  phases: [{ at: 1, moves: ['breath', 'tail', 'gust', 'dive', 'clawcombo', 'emberrain'] },
+           { at: 0.8, moves: ['breath', 'tail', 'skyfall', 'hellspiral', 'dive', 'flamewall', 'clawcombo'], speed: 1.15, wind: 0.85, terra: 'LAVA' },
+           { at: 0.4, moves: ['breath', 'infernodive', 'lastflame', 'skyfall', 'tail', 'flamewall', 'emberrain', 'clawcombo'], speed: 1.3, wind: 0.75, firestorm: true }] });
 ENEMIES.BOSSCLONE = { name: 'Mirror Image', ai: 'clone', hp: 1, speed: 90, r: 50, dmg: 0, color: '#c9a8ff', mass: 2, gold: 0, illusion: true };
 for (const d of BOSS_DEFS) ENEMIES[d.id] = { name: d.name, hp: d.hp, speed: 0, r: d.r, dmg: 0, color: d.color, mass: 40, gold: 0 };
 
@@ -236,6 +236,31 @@ const MOVES = {
     g.emit('bossRoar', { x: b.x, y: b.y });
     return 99;
   },
+  // Cào liên hoàn: 3 nhát vuốt lửa áp sát, mỗi nhát nhắm lại và lướt tới (pha sau thêm nhát thứ 4 rộng)
+  clawcombo(g, b, w) {
+    const n = b.phase > 0 ? 4 : 3; let t = 0;
+    for (let i = 0; i < n; i++) { const last = i === n - 1 && b.phase > 0, wind = (i === 0 ? 0.6 : 0.34) * w;
+      at(b, t, () => haz(g, b, { kind: 'arc', r: last ? 260 : 200, arc: last ? 3.4 : 1.9, t: wind, dmg: last ? 36 : 26, track: 'aim', lock: wind * 0.5, side: i % 2 ? 1 : -1, sty: 'fire',
+        after: () => { const a = aimAt(b, g.p); b.face = a; b.x += Math.cos(a) * 70; b.y += Math.sin(a) * 70; g.world.collide(b, b.r * 0.8); if (g.surface) g.surface.apply(b.x + Math.cos(a) * 90, b.y + Math.sin(a) * 90, 40, 'BURN', { rand: g.rand, life: 2 }); } }));
+      t += wind + 0.06; }
+    return t + 0.5 * w;
+  },
+  // Mưa than hồng: 3 đợt vòng lửa rơi vào chỗ người chơi sắp tới (không bay lên, ra đòn liền tay)
+  emberrain(g, b, w) {
+    for (let k = 0; k < 3; k++) for (let i = 0; i < 3; i++) at(b, k * 0.45 + i * 0.08, () => { const [x, y] = i === 0 ? [g.p.x, g.p.y] : lead(g, 0.7, i, 20); haz(g, b, { kind: 'circle', x, y, r: 62, t: 0.8 * w, dmg: 26, after() { if (g.surface) g.surface.apply(this.x, this.y, 40, 'BURN', { rand: g.rand, life: 3 }); } }); });
+    b.glow = 0.5; g.emit('bossWind', { x: b.x, y: b.y, kind: 'breath' });
+    return 3 * 0.45 + 0.8 * w + 0.3;
+  },
+  // Tường lửa: hai bức tường cột lửa quét ngang sân từ hai phía, mỗi bức chừa một khe, khe lệch nhau
+  flamewall(g, b, w) {
+    const A = g.arena || { x: b.x, y: b.y, r: 600 }, a = g.rand() * TAU, nx = Math.cos(a), ny = Math.sin(a), tx = -ny, ty = nx, cols = 11, rows = 9;
+    for (const side of [-1, 1]) { const gap = Math.floor(g.rand() * (cols - 3)) + 1, delay = side > 0 ? 0 : 1.2;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { if (c >= gap && c < gap + 2) continue;
+        const off = (c - (cols - 1) / 2) * 92, d = side * (A.r - 60 - r * ((A.r - 60) * 2 / rows));
+        haz(g, b, { kind: 'circle', x: A.x + nx * d + tx * off, y: A.y + ny * d + ty * off, r: 50, t: (0.9 + r * 0.16) * w + delay, dmg: 28, after() { if (g.surface) g.surface.apply(this.x, this.y, 30, 'BURN', { rand: g.rand, life: 1.5 }); } }); } }
+    b.glow = 0.9 * w; b.anchor = 1.0; g.emit('bossRoar', { x: b.x, y: b.y }); b.chanT = (0.9 + rows * 0.16) * w + 1.2;
+    return (0.9 + rows * 0.16) * w + 1.6;
+  },
   // NGỌN LỬA CUỐI CÙNG: bay lên giữa sân, gồng rồi thiêu toàn đấu trường — chỉ chỗ khuất sau mỏm đá là an toàn
   lastflame(g, b, w) {
     if ((g.t - (b.lfT ?? -99)) < 25) return MOVES.infernodive(g, b, w);
@@ -392,6 +417,7 @@ function chooseMove(g, b, P, d) {
 
 export function staggerBoss(g, b, t, why) {
   if (b.dead || g.brutal) return;   // Brutal: boss không bao giờ bị choáng
+  t *= b.def.staggerMul || 1;   // boss cuối (4, 5) đứng hình ngắn hơn
   b.stagger = t; b.poise = b.poiseMax; b.poiseImm = t + 5; b.dashing = null; b.sched = []; b.busy = 0; b.tele = null; b.alpha = 1;
   if (b.leap) { b.leap = null; b.z = 0; }
   g.hazards = g.hazards.filter(h => h.owner !== b || h.done);
@@ -534,7 +560,7 @@ export function bossUpdate(g, b, dt) {
   if (b.idle <= 0) {
     const mv = chooseMove(g, b, P, d); b.last = mv; if (MOVE_CD[mv]) { b.cd = b.cd || {}; b.cd[mv] = g.t + MOVE_CD[mv]; }
     b.busy = MOVES[mv](g, b, w);
-    b.idle = (0.35 + g.rand() * 0.5) * w * (hid ? 1.6 : 1) * (g.brutal ? 0.55 : 1);
+    b.idle = (0.35 + g.rand() * 0.5) * w * (hid ? 1.6 : 1) * (g.brutal ? 0.55 : 1) * (b.def.idleMul || 1);   // boss 4, 5: dồn đòn hơn
     const L = (LINKS[b.type] || {})[mv];
     if (L && !hid && !b.linked && g.rand() < L[1] + (g.brutal ? 0.25 : 0)) { const nx = typeof L[0] === 'function' ? L[0](b) : L[0]; if (MOVES[nx]) { b.forceMove = nx; b.idle = 0.05; b.linked = true; g.emit('bossLink', { x: b.x, y: b.y }); } }
     else b.linked = false;

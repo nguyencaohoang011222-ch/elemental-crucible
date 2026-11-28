@@ -10,7 +10,9 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const DEV_MAIL = 'nguyencaohoang011222@gmail.com';
 let A = null, brutal = false, season = null, lbTab = 'all';
 
-export const brutalOk = () => brutal;
+// chạy trên máy (localhost) để test: Brutal luôn mở, không cần mã mời
+const LOCAL = typeof location !== 'undefined' && (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.hostname.endsWith('.localhost'));
+export const brutalOk = () => brutal || LOCAL;
 // điểm mùa của một lượt Brutal (cùng công thức với season_board trong redeem.sql)
 export const seasonPoints = (stage, won, time) => stage * 10 + (won ? 150 + Math.max(0, 120 - Math.floor(time / 30)) : 0);
 

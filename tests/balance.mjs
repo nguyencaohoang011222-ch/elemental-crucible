@@ -55,4 +55,18 @@ const ultG = (cls, els, setup) => { const g = lab(cls); const es = setup ? setup
 { const { g } = ultG('MAGE', ['FIRE', 'EARTH', 'WIND'], g => [foe(g, 200, 0)]); run(g, 1); ok(g.walls.some(w => w.lava), 'Comet Trench leaves a wall'); }
 { const { g, sk } = ultG('MAGE', ['FIRE', 'WATER', 'WIND'], g => [foe(g, 200, 0)]); run(g, 0.2); const s1 = g.coreSkill({ type: 'el', el: 'FIRE' }); g.p.energy = 500; g.p.gcd = 0; g.castNow(s1, g.p.x + 200, g.p.y); ok(g.p.storm > 0 && Math.abs(500 - g.p.energy - s1.cost * (1 - sk.stormRefund)) < 1, 'Thunderhead storm mode: single skills cost half'); }
 
+// ---------- Boomerang Blade: tụ đầy vẫn giữ sóng đẩy lùi và các nâng cấp nhát tụ ----------
+{ const { RELIC_BY_ID } = await import('../relics.js');
+  const g = lab('KNIGHT'), p = g.p; g.labFreezeAI = true; RELIC_BY_ID.boomerang.apply(p.mods, g); p.mods.swordWave = 1; g.refreshStats(false);
+  const near = foe(g, -120, 0), n0 = g.shots.length; const x0 = near.x;
+  g.basicAttack(1); run(g, 0.2);
+  ok((g.relicFx || []).some(f => f.type === 'blade'), 'full charge still throws the Boomerang Blade');
+  ok(Math.abs(near.x - x0) > 5 || near.hp < near.max, 'the charged knockback wave still hits foes behind you');
+  ok(g.shots.length > n0 || g.shots.some(s => s.kind === 'wave'), 'Sword Wave still fires on a Boomerang throw'); }
+
+// ---------- boss 4 (Ignivar) có bộ chiêu mới, boss 4–5 dồn đòn hơn ----------
+{ const { BOSS_DEFS } = await import('../boss.js'); const D = BOSS_DEFS.find(d => d.id === 'DRAGON'), S = BOSS_DEFS.find(d => d.id === 'SOVEREIGN');
+  ok(['clawcombo', 'emberrain', 'flamewall'].every(m => D.phases.some(ph => ph.moves.includes(m))), 'Ignivar has its new moves');
+  ok(D.idleMul < 1 && S.idleMul < 1 && D.staggerMul < 1 && S.staggerMul < 1, 'bosses 4 and 5 rest less and stay staggered shorter'); }
+
 if (fail) { console.log(fail + ' failed'); process.exit(1); } else console.log('all passed');
