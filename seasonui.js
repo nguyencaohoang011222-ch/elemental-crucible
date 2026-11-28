@@ -10,7 +10,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const DEV_MAIL = 'nguyencaohoang011222@gmail.com';
 let A = null, brutal = false, season = null, lbTab = 'all';
 
-// chạy trên máy (localhost) để test: Brutal luôn mở, không cần mã mời
+// chạy trên máy (localhost) để test: Brutal luôn mở, không cần được cấp quyền
 const LOCAL = typeof location !== 'undefined' && (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.hostname.endsWith('.localhost'));
 export const brutalOk = () => brutal || LOCAL;
 // điểm mùa của một lượt Brutal (cùng công thức với season_board trong redeem.sql)
@@ -46,9 +46,8 @@ async function doRedeem() {
   const r = await ON.redeemCode($('redeemin').value); b.disabled = false;
   if (r.error) { m.textContent = r.error; return; }
   if (r.gems > 0) { PR.addGems(r.gems); A.refreshGems(); }
-  if (r.kind === 'brutal') { brutal = true; A.onAccess(); }
-  m.className = 'nickerr ok'; m.innerHTML = (r.gems > 0 ? PXI('gem', 14) + ' +' + r.gems + ' gems' : '') + (r.kind === 'brutal' ? (r.gems > 0 ? ' · ' : '') + 'Brutal unlocked!' : '');
-  A.showHint(r.kind === 'brutal' ? 'Brutal early access unlocked.' : 'Code redeemed: +' + r.gems + ' gems.', 3);
+  m.className = 'nickerr ok'; m.innerHTML = PXI('gem', 14) + ' +' + (r.gems || 0) + ' gems';
+  A.showHint('Code redeemed: +' + (r.gems || 0) + ' gems.', 3);
 }
 
 // ---------- bảng phần thưởng ----------
@@ -60,7 +59,7 @@ export function openRewards(focus) {
   const B = tr('brutal');
   const brut = '<ol class="rwlist">' + row(PXI('gem', 16), '+' + E.hardWin + ' gems on victory', 'On top of the Normal rewards') + row(sw(B.c), B.name + ' (exclusive)', 'First Brutal victory: trail + aura, never sold') + row(PXI('bolt', 16), 'Season points', 'Stage × 10, victory +150, speed bonus · best 10 runs count') + '</ol>';
   const seasonList = '<ol class="rwlist season">' + PR.SEASON_REWARDS.map(r => { const t = r.trail ? tr(r.trail) : null; return row('<b class="rwrank">' + (r.rank === 10 ? '4–10' : '#' + r.rank) + '</b>', (t ? t.name + ' trail + aura · ' : '') + r.gems + ' gems', r.extra || ''); }).join('') + '</ol>';
-  const lock = brutal ? '' : '<p class="rwlock">' + PXI('lock', 14) + ' Brutal is in early access. Got an invite code? Enter it in <b>Redeem code</b> on the title screen.</p>';
+  const lock = brutalOk() ? '' : '<p class="rwlock">' + PXI('lock', 14) + ' Brutal is in early access for invited accounts. Sign in with Google: invited players see it unlocked.</p>';
   $('rwbody').innerHTML = '<div class="rwcols"><section class="rwcol' + (focus === 'NORMAL' ? ' on' : '') + '"><h3>Normal</h3>' + normal + '</section><section class="rwcol brutal' + (focus === 'HARD' ? ' on' : '') + '"><h3>Brutal</h3>' + brut + '</section></div>' +
     '<section class="rwseason"><h3>Brutal season · every 2 weeks</h3>' + seasonList + '</section>' + lock;
   A.openModal('rewards');

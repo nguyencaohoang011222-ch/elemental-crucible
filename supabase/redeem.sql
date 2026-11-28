@@ -1,4 +1,4 @@
--- Elemental Arena: mã đổi quà, quyền early access Brutal, mùa Brutal 2 tuần.
+-- Elemental Arena: mã đổi quà (chỉ gem), quyền early access Brutal (cấp theo tài khoản, không liên quan mã), mùa Brutal 2 tuần.
 -- Dán toàn bộ file này vào Supabase → SQL Editor → Run (chạy lại nhiều lần cũng an toàn).
 -- Cần chạy schema.sql trước (bảng profiles, runs).
 
@@ -6,7 +6,7 @@
 -- Không có policy nào trên bảng codes → không ai đọc / sửa được qua API; chỉ hàm redeem_code (security definer) chạm vào.
 create table if not exists public.codes (
   code text primary key check (code ~ '^[A-Z0-9-]{4,24}$'),
-  kind text not null default 'gems' check (kind in ('gems', 'brutal')),
+  kind text not null default 'gems',
   gems int not null default 0 check (gems between 0 and 100000),
   max_uses int not null default 1 check (max_uses >= 1),
   uses int not null default 0,
@@ -27,7 +27,7 @@ alter table public.redemptions enable row level security;
 drop policy if exists "own redemptions" on public.redemptions;
 create policy "own redemptions" on public.redemptions for select using (auth.uid() = user_id);
 
--- quyền của tài khoản (early access Brutal)
+-- quyền của tài khoản (early access Brutal): chỉ bạn cấp bằng SQL (xem cuối file), mã đổi quà không mở được
 create table if not exists public.entitlements (
   user_id uuid primary key references auth.users (id) on delete cascade,
   brutal boolean not null default false,
@@ -49,11 +49,7 @@ begin
   if exists (select 1 from public.redemptions where user_id = uid and code = r.code) then return json_build_object('error', 'You already used this code.'); end if;
   insert into public.redemptions (user_id, code) values (uid, r.code);
   update public.codes set uses = uses + 1 where code = r.code;
-  if r.kind = 'brutal' then
-    insert into public.entitlements (user_id, brutal) values (uid, true)
-    on conflict (user_id) do update set brutal = true, updated_at = now();
-  end if;
-  return json_build_object('kind', r.kind, 'gems', r.gems, 'code', r.code);
+  return json_build_object('kind', 'gems', 'gems', r.gems, 'code', r.code);
 end $$;
 revoke all on function public.redeem_code(text) from public, anon;
 grant execute on function public.redeem_code(text) to authenticated;
@@ -101,11 +97,12 @@ language sql stable as $$
 $$;
 grant execute on function public.season_board(int, int) to anon, authenticated;
 
--- ---------- tạo mã (chạy riêng mỗi khi muốn phát quà) ----------
+-- ---------- tạo mã gem (chạy riêng mỗi khi muốn phát quà) ----------
 -- 500 gem, 5 người dùng được, hết hạn sau 7 ngày:
---   insert into public.codes (code, kind, gems, max_uses, expires_at, note) values ('FRIENDS500', 'gems', 500, 5, now() + interval '7 days', 'ban be');
--- mã mời early access Brutal (kèm 100 gem), 3 người:
---   insert into public.codes (code, kind, gems, max_uses, note) values ('BRUTAL-ALPHA', 'brutal', 100, 3, 'early access');
+--   insert into public.codes (code, gems, max_uses, expires_at, note) values ('TENMACUABAN', 500, 5, now() + interval '7 days', 'ban be');
 -- xem mã đã dùng bao nhiêu:   select code, kind, gems, uses, max_uses, expires_at from public.codes order by created_at desc;
--- cấp quyền Brutal thẳng cho một nickname:
+-- ---------- early access Brutal (không liên quan mã đổi quà) ----------
+-- cấp cho một nickname:
 --   insert into public.entitlements (user_id, brutal) select id, true from public.profiles where nickname = 'TenBan' on conflict (user_id) do update set brutal = true;
+-- thu hồi:   update public.entitlements set brutal = false where user_id = (select id from public.profiles where nickname = 'TenBan');
+-- xem ai đang có:   select p.nickname from public.entitlements e join public.profiles p on p.id = e.user_id where e.brutal;

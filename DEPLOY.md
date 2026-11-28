@@ -41,13 +41,14 @@ Web chỉ cập nhật khi có **push** lên GitHub. Chỉ cần nói với Clau
    - anon key được phép nằm công khai trong code web; dữ liệu đã có Row Level Security bảo vệ.
    - **Tuyệt đối không** gửi hay dán `service_role` key.
 
-## Bước 3b — Mã đổi quà, early access Brutal, mùa Brutal
+## Bước 3b — Mã đổi quà (gem), early access Brutal, mùa Brutal
 
 1. Supabase → **SQL Editor** → **New query**, mở [supabase/redeem.sql](supabase/redeem.sql), copy toàn bộ, dán vào, bấm **Run**. Chạy lại nhiều lần cũng an toàn.
 2. Mùa 1 bắt đầu đúng lúc bạn chạy file này lần đầu; mỗi mùa 14 ngày, tự nối tiếp.
 3. Tạo mã: chạy một dòng SQL (mẫu có ở cuối file), ví dụ:
-   - 500 gem cho 5 người, hết hạn sau 7 ngày: `insert into public.codes (code, kind, gems, max_uses, expires_at) values ('FRIENDS500', 'gems', 500, 5, now() + interval '7 days');`
-   - mã mời Brutal (kèm 100 gem) cho 3 người: `insert into public.codes (code, kind, gems, max_uses) values ('BRUTAL-ALPHA', 'brutal', 100, 3);`
+   - 500 gem cho 5 người, hết hạn sau 7 ngày: `insert into public.codes (code, gems, max_uses, expires_at) values ('TENMACUABAN', 500, 5, now() + interval '7 days');` (đặt tên mã riêng, đừng dùng tên mẫu)
+   - mã đổi quà chỉ cho gem, không mở Brutal.
+3b. Early access Brutal: cấp theo nickname, `insert into public.entitlements (user_id, brutal) select id, true from public.profiles where nickname = 'TenBan' on conflict (user_id) do update set brutal = true;` (người đó phải đăng nhập và đặt nickname trước). Trên localhost Brutal luôn mở để test.
 4. Người chơi đăng nhập Google, bấm **Redeem code** ở góc trên trái màn hình chính, nhập mã.
 5. Hết mùa, người hạng 1–10 nhận thưởng khi đăng nhập lại. Hạng 1 thấy email liên hệ của bạn trong thông báo riêng.
 

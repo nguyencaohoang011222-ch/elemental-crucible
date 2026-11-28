@@ -67,8 +67,8 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 
 ## Redeem codes, Brutal early access, Brutal seasons
 
-- Server side lives in `supabase/redeem.sql` (the user pastes it into the SQL Editor): `codes` (no RLS policies, so only `redeem_code` can touch it), `redemptions` (one use per account per code), `entitlements` (`brutal`), `season_config` (epoch + 14 days, seasons roll on automatically), `season_now()`, `season_board(n)` (sum of the best 10 Brutal runs, entitled accounts only, absurd times dropped).
-- Client: `online.js` (`redeemCode`, `fetchEntitlements`, `seasonNow`, `seasonBoard`) and `seasonui.js` (Redeem modal, Brutal lock on the New Run difficulty button, Rewards modal, leaderboard tabs All time / Brutal season / Hall of Fame, season reward claim on sign-in). Season points use the same formula on both sides (`seasonPoints`).
+- Server side lives in `supabase/redeem.sql` (the user pastes it into the SQL Editor): `codes` (no RLS policies, so only `redeem_code` can touch it), `redemptions` (one use per account per code), `entitlements` (`brutal`, granted by the developer per nickname with SQL; redeem codes never grant it), `season_config` (epoch + 14 days, seasons roll on automatically), `season_now()`, `season_board(n)` (sum of the best 10 Brutal runs, entitled accounts only, absurd times dropped).
+- Client: `online.js` (`redeemCode`, `fetchEntitlements`, `seasonNow`, `seasonBoard`) and `seasonui.js` (Redeem modal for gem codes only, Brutal lock on the New Run difficulty button (always open on localhost), Rewards modal, leaderboard tabs All time / Brutal season / Hall of Fame, season reward claim on sign-in). Season points use the same formula on both sides (`seasonPoints`).
 - Rewards: first Brutal win gives the exclusive `brutal` trail + aura; season ranks 1/2/3/top 10 get `champion` / `silver` / `bronze` trails, gems and a badge (`PR.claimSeason`, `SEASON_REWARDS`). The developer email is shown only to the season champion. Trails with `aura` draw a ring under the player (`R.opts.aura`).
 
 ## Balance rules
