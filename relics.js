@@ -187,7 +187,7 @@ export function tickRelics(g, dt) {
         g.emit('boom', { x: f.x, y: f.y, r: R, el: 'FIRE' }); f.done = true; } }
     else if (f.type === 'ghost' || f.type === 'bat') { f.life -= dt; const e = near(g, f.x, f.y, 520);
       if (e) { const a = Math.atan2(e.y - f.y, e.x - f.x), sp = f.type === 'bat' ? 330 : 260; f.vx += (Math.cos(a) * sp - f.vx) * Math.min(1, dt * 5); f.vy += (Math.sin(a) * sp - f.vy) * Math.min(1, dt * 5);
-        if (dist(f.x, f.y, e.x, e.y) < e.r + 10) { g.hurtEnemy(e, f.dmg * (M.dmg || 1), a, 80, 'relic'); if (f.type === 'bat') p.hp = Math.min(p.max, p.hp + 1 * healMul(p)); f.done = true; g.emit('relicBite', { x: e.x, y: e.y, kind: f.type }); } }
+        if (dist(f.x, f.y, e.x, e.y) < e.r + 10) { g.hurtEnemy(e, f.dmg * (M.dmg || 1), a, 80, 'relic'); if (f.type === 'bat') g.heal(1); f.done = true; g.emit('relicBite', { x: e.x, y: e.y, kind: f.type }); } }
       f.x += f.vx * dt; f.y += f.vy * dt; if (f.life <= 0) f.done = true; }
     else if (f.type === 'blade') { f.spin += dt * 20; const sp = f.out ? 700 : 820;
       if (f.out) { f.x += Math.cos(f.a) * sp * dt; f.y += Math.sin(f.a) * sp * dt; f.d += sp * dt; if (f.d >= 300 || g.world.blocked(f.x, f.y, 10)) { f.out = false; f.hit = new Set(); } }

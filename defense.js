@@ -48,7 +48,18 @@ export function safeSpot(g, r = 320) {
 export function slowmo(g, t) { const p = g.p; p.slowmoT = Math.max(p.slowmoT || 0, t); g.emit('slowmo', { x: p.x, y: p.y, t }); }
 export function shield(g, n, t) { const p = g.p; p.shield = Math.max(p.shield || 0, n); p.shieldT = Math.max(p.shieldT || 0, t); g.emit('shieldUp', { x: p.x, y: p.y, n }); }
 export function dr(g, amt, t) { const p = g.p; if (amt >= (p.drAmt || 0) || !(p.drT > 0)) p.drAmt = amt; p.drT = Math.max(p.drT || 0, t); }
-export function heal(g, n) { const p = g.p; if (!(n > 0) || p.hp <= 0) return; const v = Math.min(p.max - p.hp, n); p.hp += v; if (v >= 1) g.emit('healTick', { x: p.x, y: p.y, v: Math.round(v) }); }
+// Trần hồi máu: mọi hồi máu theo thời gian / theo đòn / theo lần tung chiêu đi qua heal() và trừ vào quỹ p.healBud,
+// quỹ nạp HEAL.perSec × máu tối đa mỗi giây, đầy tối đa HEAL.burst giây. Bình máu, đồ rơi, qua stage không qua đây (không tính trần).
+export const HEAL = { perSec: 0.03, burst: 1 };
+export function healCap(p) { return HEAL.perSec * p.max; }
+export function tickHeal(p, dt) { const c = healCap(p) * HEAL.burst; p.healBud = Math.min(c, (p.healBud ?? c) + healCap(p) * dt); }
+export function heal(g, n) {
+  const p = g.p; if (!(n > 0) || p.hp <= 0) return 0;
+  n *= p.mods.healMul || 1;   // Blood Pact… giảm mọi nguồn hồi
+  if (p.healBud === undefined) p.healBud = healCap(p) * HEAL.burst;
+  const v = Math.min(p.max - p.hp, n, p.healBud); if (!(v > 0)) return 0;
+  p.healBud -= v; p.hp += v; if (v >= 1) g.emit('healTick', { x: p.x, y: p.y, v: Math.round(v) }); return v;
+}
 // hoá vàng: bất tử + đứng yên t giây; hết vàng thì (tuỳ chọn) dịch chuyển tới chỗ an toàn trong bán kính tele
 export function goldStatue(g, t, opts = {}) {
   const p = g.p; p.goldT = t; p.goldT0 = t; p.goldTele = opts.tele || 0; p.goldEnd = opts.onEnd || null; p.vx = p.vy = 0; p.charge = 0;

@@ -8,7 +8,7 @@ import { BOSS_DEFS, makeBoss, bossUpdate, updateHazards, poiseDamage } from './b
 import { themeForStage } from './env.js';
 import { buildArena, teardownArena, ARENA_R } from './arena.js';
 import { castUlt, updateUlts } from './ults.js';
-import { tickDefense, withPhantom, dmgTakenMul, critMul, clearShots } from './defense.js';
+import { tickDefense, withPhantom, dmgTakenMul, critMul, clearShots, heal, tickHeal } from './defense.js';
 import { forgeDef, onCast, onHit, onTrap, onKill as onKillF, onDashEnd, onZone, onShot, onShotEnd } from './forgeups.js';
 import { relicBasic, relicHit, relicKill, relicCastAim, relicAfterCast, relicBlocksEnergy, healMul, tickRelics, relicShots, relicExplode, canBloodPay, bloodPay } from './relics.js';
 import { GOLD, BOSS_GOLD, goldRoll, enterForge, stageGold, rollForge, inForge, FORGE_R, FORGE_CALM, FORGE_NOSPAWN, smithOf, drinkPotion } from './forge.js';
@@ -71,6 +71,9 @@ export const PER_PLAYER = ['inQ', 'dashQ', 'spaceQ', 'aim', 'rewards', 'shopBuys
 // vật thể do người chơi tạo ra: mỗi món nhớ chủ để khi cập nhật thì g.p = chủ của nó
 const OWNED = ['shots', 'zones', 'pending', 'traps', 'walls', 'ults', 'relicFx'];
 // Brutal: quái trâu và đông hơn, ra đòn dồn dập hơn, bắn gấp đôi đạn; boss không bị choáng và đánh liên tục
+// ---------- luật cân bằng chung (vòng lặp /tune được phép chỉnh các số này) ----------
+// CD: hồi chiêu riêng từng chiêu = cd định nghĩa × scale
+export const CD = { scale: 0.45 };
 export const BRUTAL = { count: 1.35, aggro: 1.4, elite: 0.55, bossWind: 0.78, bossIdle: 0.55, bossSpeed: 1.15, link: 0.25, twinSpread: 0.2 };
 export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
 export const MAP_HP = { forest: 1, dungeon: 1.2, frost: 1.4, volcano: 1.6, palace: 1.8 };   // máu gốc quái thường theo map
@@ -97,7 +100,7 @@ export class Game extends Sim {
     this.stats = { dmg: 0, bossKills: 0 };
     this.stage = 0; this.state = 'fight'; this.rewards = []; this.spawnQ = []; this.sigils = []; this.burstT = 0; this.stageT = 0; this.stageTotal = 0;
     this.arena = null; this.boss = null; this.loot = null; this.portal = null; this.travel = 0; this.deathSlow = 0; this.clearT = 0; this.waveN = 0; this.waveOf = 0; this.waveRest = 0; this.won = false; this.dmgScale = 1; this.packs = 0; this.packT = 3;
-    this.skillCache = new Map(); this.pickups = []; this.statDrops = 0;
+    this.skillCache = new Map(); this.pickups = []; this.statDrops = 0; this.heal = n => heal(this, n);
     const ob = this.world.onBreak; this.world.onBreak = o => { ob(o); this.rollDrop(o.supply ? 'supply' : o.type === 'crate' && o.v > 0.85 ? 'treasure' : o.type, o.x, o.y); };
     this.rerolls = 3; this.paidRerolls = 0; this.revived = false; p.skin = opts.skin || ''; p.skinFx = opts.skinFx || null;
     initEnv(this, opts); this.lab = !!opts.lab; if (this.lab) this.labTheme = opts.theme || 'forest'; setTheme(this, opts.theme || 'forest');
@@ -128,7 +131,8 @@ export class Game extends Sim {
     // chiêu 3 nguyên tố: giá theo sức mạnh thật (thang log): yếu ~35, mạnh nhất ~90
     const base = def.ultCost ? def.ultCost / 100 * (CLASSES[this.p.cls].energy || 100) : def.tier === 3 ? Math.max(35, Math.min(90, 30 + 13 * Math.log(Math.max(1, skillPower(def)) / 40))) : 7 + def.cd * 3.4;
     out.cost = Math.round(base * cd);
-    out.cd = 0;
+    // hồi chiêu riêng từng chiêu: cd trong định nghĩa × CD.scale (chiêu đơn ~1,4–3,6 s, tuyệt kỹ ~9 s); Focus / Mastery rút ngắn theo cùng hệ số giá
+    out.cd = +(def.cd * cd * CD.scale).toFixed(2);
     if (def.tags.includes('projectile') && (m.projExtra || m.pierce)) {
       if (out.shape === 'volley') out.count += 2 * m.projExtra;
       if (out.arrows) out.arrows.count += m.projExtra;
@@ -157,7 +161,7 @@ export class Game extends Sim {
     if (!s && core.type === 'inf') { // chiêu đôi + lõi đơn: tung cả hai chiêu cùng lúc
       const fi = this.p.forged.has('INF:' + core.els.join('>') + '+' + core.add); // rèn Infused = rèn cả hai chiêu thành phần
       const a = this.coreSkill({ type: 'duo', els: core.els }, fi), b = this.coreSkill({ type: 'el', el: core.add }, fi);
-      s = { ...a, key: a.key + '+' + core.add, name: a.name + ' + ' + b.name, dual: [a, b], cost: Math.round((a.cost + b.cost) * 0.85), els: [...new Set([...a.els, ...b.els])], combo: [...core.els, core.add], tier: 2, desc: 'Casts ' + a.name + ' and ' + b.name + ' at the same time. ' + a.desc };
+      s = { ...a, key: a.key + '+' + core.add, name: a.name + ' + ' + b.name, dual: [a, b], cost: Math.round((a.cost + b.cost) * 0.85), cd: +Math.max(a.cd, b.cd * 1.5).toFixed(2), els: [...new Set([...a.els, ...b.els])], combo: [...core.els, core.add], tier: 2, desc: 'Casts ' + a.name + ' and ' + b.name + ' at the same time. ' + a.desc };
       this.skillCache.set(k, s);
     }
     if (!s) { let d = coreDef(this.p.cls, core); if (forceForge || this.p.forged.has(d.key)) d = forgeDef(this.p.cls, d); s = this.applyMods(d); if (core.type === 'inf' && this.p.forged.has('INF:' + core.els.join('>') + '+' + core.add)) { s = { ...s, forged: true, name: 'Forged ' + s.name }; } this.skillCache.set(k, s); }
@@ -272,7 +276,8 @@ export class Game extends Sim {
     const p = this.p;
     for (const k in p.cds) { p.cds[k] -= dt; if (p.cds[k] <= 0) delete p.cds[k]; }
     p.gcd = Math.max(0, p.gcd - dt); p.castAnim = Math.max(0, p.castAnim - dt);
-    const hr = (p.mods.regen || 0) + (CLASSES[p.cls].hpRegen || 0); if (hr && p.hp > 0) p.hp = Math.min(p.max, p.hp + hr * (p.mods.regenMul || 1) * healMul(p) * dt);
+    tickHeal(p, dt);
+    const hr = (p.mods.regen || 0) + (CLASSES[p.cls].hpRegen || 0); if (hr && p.hp > 0) heal(this, hr * (p.mods.regenMul || 1) * dt);
     if (this.infHp) { p.hurtClock = (p.hurtClock || 0) + dt; if (p.hp < p.max && p.hurtClock > 1.2) p.hp = p.max; }
     if (this.labEnergy) p.energy = p.energyMax;
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) p.shield = 0; }
@@ -297,7 +302,9 @@ export class Game extends Sim {
   canAct() { const p = this.p; return !p.leap && p.sdashT <= 0; }
   tryCast(sk, it) {
     const p = this.p;
-    if (p.energy < sk.cost && !(p.freeCast === sk.key && p.freeCastT > 0) && !canBloodPay(this, sk.cost)) { this.emit('noEnergy', { name: sk.name, cost: sk.cost }); return false; }
+    const freeNow = p.freeCast === sk.key && p.freeCastT > 0;
+    if (!freeNow && p.cds[sk.key] > 0) { this.emit('notReady', { name: sk.name, cd: p.cds[sk.key] }); return false; }   // đang hồi chiêu
+    if (p.energy < sk.cost && !freeNow && !canBloodPay(this, sk.cost)) { this.emit('noEnergy', { name: sk.name, cost: sk.cost }); return false; }
     const ax = it.cx ?? it.ax ?? p.x + Math.cos(p.aim) * 200, ay = it.cy ?? it.ay ?? p.y + Math.sin(p.aim) * 200;
     if (!this.canAct() || p.gcd > 0) { p.queued = { sk, ax, ay, t: 0.4 }; return true; } // hàng chờ: tung ngay khi có thể
     this.castNow(sk, ax, ay); return true;
@@ -307,10 +314,11 @@ export class Game extends Sim {
     const p = this.p, free = p.freeCast === sk.key && p.freeCastT > 0;
     if (!free && p.energy < sk.cost && !canBloodPay(this, sk.cost)) { this.emit('noEnergy', { name: sk.name, cost: sk.cost }); return; }
     if (free) { p.freeCast = null; p.freeCastT = 0; this.emit('freeCast', { x: p.x, y: p.y }); } else if (p.energy >= sk.cost) p.energy -= sk.cost; else bloodPay(this, sk.cost);   // Blood Magic: phần thiếu trả bằng máu
+    if (!free && sk.cd > 0) p.cds[sk.key] = sk.cd;   // bản sao miễn phí (Echo, Wild, tung lại) không tính hồi chiêu
     this._castCost = free ? 0 : sk.cost; p.gcd = 0.25; p.castAnim = 0.25; this.casts++;
     const first = !this.discovered.has(sk.key); this.discovered.add(sk.key);
     if (sk.els.length > 1 && p.mods.comboFlow) this.gainEnergy(p.mods.comboFlow);
-    if (sk.healOnCast) p.hp = Math.min(p.max, p.hp + sk.healOnCast);
+    if (sk.healOnCast) heal(this, sk.healOnCast);
     if (sk.shieldOnCast) { p.shield = Math.max(p.shield, sk.shieldOnCast); p.shieldT = Math.max(p.shieldT, 4); }
     this.emit('skill', { x: p.x, y: p.y, key: sk.key, name: sk.name, group: sk.group, first, els: sk.combo });
     const tgt = s2 => { const [tx, ty] = this.aimTarget(s2, ax, ay); return [tx, ty]; };
@@ -524,7 +532,9 @@ export class Game extends Sim {
     dmg *= relicHit(this, e, kind);
     dmg *= critMul(this, e, dmg, kind);
     this.stats.dmg += dmg;
-    if ((kind === 'skill' || kind === 'echo') && this.p.mods.lifesteal) this.p.hp = Math.min(this.p.max, this.p.hp + dmg * this.p.mods.lifesteal * healMul(this.p));
+    if ((kind === 'skill' || kind === 'echo') && this.p.mods.lifesteal) heal(this, dmg * this.p.mods.lifesteal);
+    // chốt pha: máu boss không tụt qua mốc pha kế tiếp; boss dừng ở mốc, diễn chuyển pha (bất tử 1,3 s) rồi mới nhận đòn tiếp. Sát thương thừa bị bỏ.
+    if (e.boss && e.def && e.def.phases) { const ph = e.def.phases, nx = ph[e.phase + 1]; if (nx) { const floor = nx.at * e.max; if (e.hp - dmg < floor) dmg = Math.max(0, e.hp - floor); } }
     const lk = this._lastKind; this._lastKind = kind; try { super.hurtEnemy(e, dmg, a, kb, kind); } finally { this._lastKind = lk; }
   }
   hurtPlayer(dmg, a, opts = {}) {

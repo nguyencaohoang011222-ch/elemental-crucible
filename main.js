@@ -1011,7 +1011,7 @@ function hud(dt) {
   const bsig = SET.control + p.cores.slice(0, BAR_SIZE).map(c => c ? JSON.stringify(c) : '-').join('|');
   if (qw.dataset.sig !== bsig) { qw.dataset.sig = bsig; buildBar(); }
   TM.syncTouch(g, iconSkill);
-  for (let i = 0; i < BAR_SIZE; i++) { const d = qw.children[i], c = p.cores[i]; if (d && c) { d.classList.toggle('poor', p.energy < g.coreSkill(c).cost); d.classList.toggle('forged', !!g.coreSkill(c).forged); } }
+  for (let i = 0; i < BAR_SIZE; i++) { const d = qw.children[i], c = p.cores[i]; if (d && c) { const sk = g.coreSkill(c); d.classList.toggle('poor', p.energy < sk.cost); d.classList.toggle('forged', !!sk.forged); TM.coolMark(d, p.cds[sk.key] || 0, sk.cd); } }
   let h = autoHint(); const H = $('hint');
   if (h && !hintState.forced) { if (hintState.gone.has(h)) h = ''; else { if (h !== hintState.cur) { hintState.cur = h; hintState.seen = 0; } hintState.seen += dt; if (hintState.seen > 8) { hintState.gone.add(h); h = ''; } } } if (H.dataset.t !== h) { H.dataset.t = h; H.innerHTML = pxText(h); } H.style.opacity = h ? 1 : 0;
 }

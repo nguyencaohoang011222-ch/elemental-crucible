@@ -90,12 +90,18 @@ export function drawTouch(c, R, g) {
   c.fillStyle = sk.cancel ? '#ff6a5a33' : '#ffe27a22'; c.fill(); c.restore();
 }
 
+// vòng hồi chiêu trên ô chiêu (PC và điện thoại): vùng tối quét theo phần còn lại + số giây
+export function coolMark(el, left, total) {
+  const on = left > 0 && total > 0; el.classList.toggle('cool', on); if (!on) return;
+  el.style.setProperty('--cd', Math.min(1, left / total).toFixed(3));
+  const t = left >= 1 ? String(Math.ceil(left)) : left.toFixed(1); if (el.dataset.cd !== t) el.dataset.cd = t;
+}
 // cập nhật icon chiêu, mờ khi thiếu năng lượng, số bình thuốc
 export function syncTouch(g, iconSkill) {
   if (!root || !touchOn() || !g || !g.p) return;
   const p = g.p, sig = p.cores.slice(0, 4).map(c => c ? JSON.stringify(c) : '-').join('|');
   if (sig !== barSig) { barSig = sig; skEls.forEach((el, i) => { const c = p.cores[i]; el.classList.toggle('empty', !c); el.innerHTML = c ? '<img src="' + iconSkill(g.coreSkill(c)) + '" alt="">' : ''; }); }
-  skEls.forEach((el, i) => { const c = p.cores[i]; if (c) el.classList.toggle('poor', p.energy < g.coreSkill(c).cost); });
+  skEls.forEach((el, i) => { const c = p.cores[i]; if (c) { const sk = g.coreSkill(c); el.classList.toggle('poor', p.energy < sk.cost); coolMark(el, p.cds[sk.key] || 0, sk.cd); } else coolMark(el, 0, 0); });
   for (const k of ['hp', 'en']) { const n = (p.potions || {})[k] || 0, el = potEls[k]; el.classList.toggle('empty', !n); const s = el.querySelector('span'); if (s && s.textContent !== String(n)) s.textContent = n; }
   dashEl.classList.toggle('cd', (p.dashCd || 0) > 0);
   spaceEl.classList.toggle('hidden', p.cls !== 'AXIOM');

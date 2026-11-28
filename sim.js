@@ -252,7 +252,7 @@ export class Sim {
       if (hits && c >= 0.7) this.hitstop = Math.max(this.hitstop || 0, 0.07); else if (hits && big) this.hitstop = Math.max(this.hitstop || 0, 0.035);
       if (hits && this.gainEnergy) this.gainEnergy(c > 0 ? 0.75 + 2.25 * c : big ? 0.75 : 0.4);
       if (hits && c === 0 && M.rhythm) p.chargePre = M.rhythm;
-      if (hits && this.t - (p.swingHealT ?? -9) >= 0.5) { p.swingHealT = this.t; p.hp = Math.min(p.max, p.hp + 1); }   // Knight: đòn thường trúng hồi 1 máu (tối đa 2/s) // năng lượng theo nhát chém, không nhân theo số quái
+      if (hits && this.t - (p.swingHealT ?? -9) >= 0.5) { p.swingHealT = this.t; if (this.heal) this.heal(1); else p.hp = Math.min(p.max, p.hp + 1); }   // Knight: đòn thường trúng hồi 1 máu (tối đa 2/s) // năng lượng theo nhát chém, không nhân theo số quái
       p.slashRef = { reach, arc, a: p.aim };   // vùng đỡ đạn = đúng vệt chém nhìn thấy
       this.emit('swing', { x: p.x, y: p.y, a: p.aim, big, combo: p.combo, hits, reach, arc, charge: c, dir: p.swingDir });
       if (hits) this.hitstop = Math.max(this.hitstop, big ? 0.075 : 0.04);
