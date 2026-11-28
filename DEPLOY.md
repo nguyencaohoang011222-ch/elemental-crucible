@@ -41,6 +41,18 @@ Web chỉ cập nhật khi có **push** lên GitHub. Chỉ cần nói với Clau
    - anon key được phép nằm công khai trong code web; dữ liệu đã có Row Level Security bảo vệ.
    - **Tuyệt đối không** gửi hay dán `service_role` key.
 
+## Bước 3b — Mã đổi quà, early access Brutal, mùa Brutal
+
+1. Supabase → **SQL Editor** → **New query**, mở [supabase/redeem.sql](supabase/redeem.sql), copy toàn bộ, dán vào, bấm **Run**. Chạy lại nhiều lần cũng an toàn.
+2. Mùa 1 bắt đầu đúng lúc bạn chạy file này lần đầu; mỗi mùa 14 ngày, tự nối tiếp.
+3. Tạo mã: chạy một dòng SQL (mẫu có ở cuối file), ví dụ:
+   - 500 gem cho 5 người, hết hạn sau 7 ngày: 
+   - mã mời Brutal (kèm 100 gem) cho 3 người: 
+4. Người chơi đăng nhập Google, bấm **Redeem code** ở góc trên trái màn hình chính, nhập mã.
+5. Hết mùa, người hạng 1–10 nhận thưởng khi đăng nhập lại. Hạng 1 thấy email liên hệ của bạn trong thông báo riêng.
+
+Lưu ý: gem và lượt chơi vẫn do trình duyệt gửi lên, người rành code vẫn gian lận được. Bảng mùa đã loại lượt có thời gian vô lý và chỉ tính tài khoản có quyền Brutal.
+
 ## Bước 4 — Đăng nhập bằng Gmail (Google OAuth)
 1. Vào https://console.cloud.google.com.
    - Tạo project mới.

@@ -76,3 +76,31 @@ export async function fetchLeaderboard(limit = 50) {
   if (user && !data.some(r => r.user_id === user.id)) { const q = await sb.from('leaderboard').select('user_id, nickname, stage, time_s, cls, won, rank').eq('user_id', user.id).maybeSingle(); me = q.data || null; }
   return { rows: data, me };
 }
+
+// ---------- mã đổi quà, quyền early access, mùa Brutal (supabase/redeem.sql) ----------
+// đổi mã: { kind: 'gems'|'brutal', gems } hoặc { error }
+export async function redeemCode(code) {
+  if (!sb) return { error: 'Redeem needs the online server.' };
+  if (!user) return { error: 'Sign in first.' };
+  const c = String(code || '').trim().toUpperCase(); if (!/^[A-Z0-9-]{4,24}$/.test(c)) return { error: 'Codes are 4–24 letters, numbers or dashes.' };
+  const { data, error } = await sb.rpc('redeem_code', { c });
+  if (error) return { error: error.message.includes('function') ? 'Redeem is not set up on the server yet.' : error.message };
+  return data || { error: 'No answer from the server.' };
+}
+// quyền của tài khoản đang đăng nhập (chưa đăng nhập / offline: không có quyền)
+export async function fetchEntitlements() {
+  if (!sb || !user) return { brutal: false };
+  const { data, error } = await sb.from('entitlements').select('brutal').eq('user_id', user.id).maybeSingle();
+  if (error) return { brutal: false };
+  return { brutal: !!(data && data.brutal) };
+}
+export async function seasonNow() {
+  if (!sb) return null;
+  const { data, error } = await sb.rpc('season_now'); if (error || !data) return null;
+  return { n: data.n, starts: new Date(data.starts_at), ends: new Date(data.ends_at) };
+}
+export async function seasonBoard(n, lim = 50) {
+  if (!sb) return { rows: [], error: 'offline' };
+  const { data, error } = await sb.rpc('season_board', { n, lim }); if (error) return { rows: [], error: error.message };
+  return { rows: data || [] };
+}

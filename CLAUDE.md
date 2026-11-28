@@ -65,6 +65,12 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 
 - Stored as `difficulty: 'HARD'` (saves and leaderboard keep the old key); the UI says Brutal. `g.brutal` and `BRUTAL` in `game.js`: enemy HP x1.4, damage x1.3, 35% more enemies, more elites, enemy timers run 1.4x faster (`aggro` in `Sim.updateEnemies`), every minion bullet gets a twin. Bosses ignore poise and stagger, attack sooner (shorter wind-up and idle), move faster and chain moves more often.
 
+## Redeem codes, Brutal early access, Brutal seasons
+
+- Server side lives in `supabase/redeem.sql` (the user pastes it into the SQL Editor): `codes` (no RLS policies, so only `redeem_code` can touch it), `redemptions` (one use per account per code), `entitlements` (`brutal`), `season_config` (epoch + 14 days, seasons roll on automatically), `season_now()`, `season_board(n)` (sum of the best 10 Brutal runs, entitled accounts only, absurd times dropped).
+- Client: `online.js` (`redeemCode`, `fetchEntitlements`, `seasonNow`, `seasonBoard`) and `seasonui.js` (Redeem modal, Brutal lock on the New Run difficulty button, Rewards modal, leaderboard tabs All time / Brutal season / Hall of Fame, season reward claim on sign-in). Season points use the same formula on both sides (`seasonPoints`).
+- Rewards: first Brutal win gives the exclusive `brutal` trail + aura; season ranks 1/2/3/top 10 get `champion` / `silver` / `bronze` trails, gems and a badge (`PR.claimSeason`, `SEASON_REWARDS`). The developer email is shown only to the season champion. Trails with `aura` draw a ring under the player (`R.opts.aura`).
+
 ## Balance rules
 
 - **Per-skill cooldowns:** `applyMods` sets `cd = def.cd × CD.scale` (`game.js`); `castNow` writes `p.cds[key]`, `tryCast` blocks with a `notReady` event. Free copies (Echo, Wild, forge recasts) ignore cooldowns. The HUD ring is `coolMark` (`mobile.js`) on `.slot` and `.tsk`.
@@ -72,6 +78,7 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - **Healing cap:** every ongoing heal (regen, lifesteal, heal on cast, forge and relic heals, Water resonance) goes through `heal()` in `defense.js` and its `HEAL.perSec` budget (3% max HP per second). Potions, heal drops and stage clear heals bypass it. New heal sources must call `g.heal(n)`, never `p.hp +=`.
 - **Boss phase gates:** `hurtEnemy` clamps boss HP at the next phase threshold, so every phase change plays.
 - **Elemental Resonance:** casting a three-element ultimate gives a 5 s buff from its three elements (`RESONANCE`, `Game.resonate`, `p.res`): Fire +20% skill damage, Water heal over time and cleanse, Earth shield and control immunity, Wind +20% move speed and 2× cooldown speed. Shown as rings at the feet and a cast text.
+- **Elites:** `ELITE` in `env.js` multiplies elite HP, speed and damage (skill damage too); skills only fire within `skillRange × ELITE.reach` and land on the player. Each elite approaches differently through `eliteSteer` (`gameenv.js`, hooked into `Sim.updateEnemies`): Ember Hulk circles to the back, Spore Mother hides behind grunts, Rime Seer kites at 380 px and sidesteps when aimed at, Blade Dancer orbits and dodges shots before blinking in, Inferno Brute runs to a diagonal before charging at where you are going. Test: `tests/elites.mjs`.
 - **Ultimate signatures** (`ults.js`, params in the `X(...)` defs of `kits.js`): Meteor Blade execute + kill chain, Monsoon Dance untargetable + kill extension, Mountain Titan shield + control immunity + pull + slowing stomps, Sunder Cyclone pull + stun per foe pulled, Meteor Arrow stun by distance, Pentagram auto-fire + root + mark, Firestorm Barrage slow + shred, Mirage decoys copy basic attacks, Solar Flare blast per foe caught, Abyssal Tide drown mark + energy refund, Comet Trench wall, Thunderhead storm mode (single skills half price + extra bolt). Marks use `e.vuln` / `e.vulnUntil` (bosses capped by `ULTFX.bossVulnCap`). Test: `tests/balance.mjs`.
 
 ## Tuning loop (balance)

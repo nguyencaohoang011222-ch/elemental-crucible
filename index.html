@@ -88,6 +88,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .mcell .mico{margin-bottom:2px}.tri{display:inline-flex;align-items:center;width:31%;min-width:180px;font-size:12px;margin:2px 0}.tri .mico{float:none}
 #labpanel{position:fixed;right:10px;top:70px;bottom:110px;width:270px;overflow:auto;background:#0b1310ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;z-index:15;font:12px system-ui;color:var(--ink)}
 #labpanel.hidden{display:none}
+/* mã đổi quà, khoá Brutal, phần thưởng, mùa */
+.redeemlink{position:fixed;left:14px;top:12px;z-index:3;background:none;border:0;color:var(--gold);font:700 13px 'Pixelify Sans',monospace;letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px;cursor:pointer;opacity:.85}.redeemlink:hover{opacity:1;color:#fff}
+#diffseg button .ea{display:none}#diffseg button.locked{opacity:.6;filter:saturate(.4)}#diffseg button.locked .ea{display:block;font:700 9px 'Pixelify Sans',monospace;font-style:normal;color:#ffb0a0;line-height:1}
+.rwlink{margin-left:8px;background:none;border:0;color:var(--gold);font:700 12px 'Pixelify Sans',monospace;text-decoration:underline;cursor:pointer}
+.rwcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.rwcol,.rwseason{background:#0d1512;border:1px solid var(--line);border-radius:8px;padding:8px 10px}.rwcol.on{border-color:var(--gold)}.rwcol.brutal h3{color:#ff8a6a}.rwseason{margin-top:10px}.rwcol h3,.rwseason h3{margin:0 0 6px;font:700 14px 'Pixelify Sans',monospace;color:var(--gold)}
+.rwlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}.rwlist li{display:flex;align-items:center;gap:8px;font-size:13px}.rwlist small{display:block;opacity:.7;font-size:11px}.rwi{flex:none;width:30px;display:grid;place-items:center}.rwsw{display:inline-block;height:8px;border-radius:2px}.rwrank{font:700 13px 'Pixelify Sans',monospace;color:var(--gold)}.rwlist.season{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px}
+.rwlock{margin:10px 0 0;font-size:13px;color:#ffcfa0}.swrank{font:700 30px 'Pixelify Sans',monospace;color:var(--gold);text-align:center;margin:4px 0}.swmail{margin-top:10px;padding:8px 10px;border:1px solid var(--gold);border-radius:8px;background:#1a1408}.swmail a{color:#ffe27a}.nickerr.ok{color:#9dff9d}
+#lbtabs{margin:4px 0 6px}
 #labpanel .lt{display:flex;align-items:center;gap:4px}#labpanel .lt small{flex:1}
 #labpanel .labx{flex:none;width:26px;height:26px;display:grid;place-items:center;background:#1a2620;border:1px solid var(--line);border-radius:5px;color:var(--ink);cursor:pointer}#labpanel .labx:hover{color:#fff;border-color:var(--gold)}
 #labtab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:15;padding:10px 6px;writing-mode:vertical-rl;background:#0b1310ee;border:1px solid var(--line);border-right:0;border-radius:8px 0 0 8px;color:var(--gold);font:700 12px 'Pixelify Sans',monospace;letter-spacing:.15em;cursor:pointer}#labtab.hidden{display:none}#labpanel .lt{margin-bottom:6px;color:var(--gold)}#labpanel .ls{border-top:1px solid #ffffff14;padding:6px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
@@ -177,7 +185,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .cprow{display:flex;gap:6px;justify-content:center;margin:6px 0}.cphero{flex:1;padding:8px 4px;background:#13201b;border:1px solid #ffffff22;color:#e8ece9;font:700 13px 'Pixelify Sans',monospace;cursor:pointer}.cphero.on,.cpel.on{border-color:var(--gold);background:#2a2412;color:#fff}.cphero:disabled,.cpel:disabled{cursor:default}
 .cpel{width:44px;height:44px;padding:4px;background:#13201b;border:1px solid #ffffff22;cursor:pointer}.cpel img{width:32px;height:32px;image-rendering:pixelated}
 #pause.coop .pbtn[data-act="restart"],#end.coop [data-act="restart"],#victory.coop [data-act="restart"]{display:none}
-@media (max-height:500px){.cpcode{font-size:38px}.cpb{padding:10px;width:170px}.cpslot{padding:6px}.cpel{width:36px;height:36px}.cpel img{width:26px;height:26px}.coopbox h2{margin:0}}
+@media (max-height:500px){.rwcols{gap:8px}.rwlist li{font-size:12px}.rwlist small{font-size:10px}.rwcol,.rwseason{padding:6px 8px}.redeemlink{top:8px;font-size:12px}.cpcode{font-size:38px}.cpb{padding:10px;width:170px}.cpslot{padding:6px}.cpel{width:36px;height:36px}.cpel img{width:26px;height:26px}.coopbox h2{margin:0}}
 .tbtn small{display:block;margin-top:2px;font:600 10px 'Pixelify Sans',monospace;letter-spacing:.06em;color:#c9b67a;text-transform:none}.tbtn span:has(small){line-height:1.05}
 .tbtn.hero svg{color:#d4af37}.tbtn.hero:hover{box-shadow:0 0 28px #d4af3766,inset 0 0 20px #d4af3730;color:#fff1b0}
 .ndot{display:none;position:absolute;right:16px;top:50%;width:9px;height:9px;margin-top:-4.500px;border-radius:50%;background:#38bdf8;box-shadow:0 0 0 0 #38bdf8aa;animation:ndot 1.8s infinite}.ndot.on{display:block}
@@ -677,13 +685,14 @@ body.touch #hint{bottom:auto;top:64px}
   <button class="ibtn" data-act="fullscreen" data-tip="Fullscreen" aria-label="Fullscreen"><i data-px="expand" data-size="18"></i></button>
   <div class="gempill" id="titlegems"></div>
 </div>
-<div class="ver">v0.1 · T: trailer</div></div>
+<div class="ver">v0.1 · T: trailer</div>
+<button class="redeemlink" id="redeembtn">Redeem code</button></div>
 
 <div id="newrun" class="screen modal"><div class="box nrbox">
   <div class="steps"><span id="st1" class="on">1 · Hero</span><span id="st2">2 · First element</span></div>
   <div id="nr1"><h2 class="nrtitle">Choose Your Hero</h2><div class="hcards" id="heroes"></div></div>
   <div id="nr2" class="hidden"><h2 class="nrtitle">Choose Your First Element</h2><div class="ecards" id="elements"></div>
-    <div class="ctlbar"><div class="ctlgrp"><span class="ctllab"><i data-px="keyboard" data-size="14"></i>Movement</span><span class="seg ctlseg"><button data-c="wasd">WASD + Mouse</button><button data-c="mouse">Right-Click</button><button data-c="touch">Touch</button></span></div><div class="ctlgrp"><span class="ctllab"><i data-px="mouse" data-size="14"></i>Difficulty</span><span class="seg" id="diffseg"><button data-d="NORMAL" class="on">Normal</button><button data-d="HARD" title="More and tougher enemies, double the bullets, bosses never stagger.">Brutal</button></span></div></div></div>
+    <div class="ctlbar"><div class="ctlgrp"><span class="ctllab"><i data-px="keyboard" data-size="14"></i>Movement</span><span class="seg ctlseg"><button data-c="wasd">WASD + Mouse</button><button data-c="mouse">Right-Click</button><button data-c="touch">Touch</button></span></div><div class="ctlgrp"><span class="ctllab"><i data-px="mouse" data-size="14"></i>Difficulty</span><span class="seg" id="diffseg"><button data-d="NORMAL" class="on">Normal</button><button data-d="HARD" title="More and tougher enemies, double the bullets, bosses never stagger.">Brutal<i class="ea">Early access</i></button></span><button class="rwlink" id="rwlink" title="See what each difficulty rewards">Rewards</button></div></div></div>
   <div class="row"><button class="btn" id="nrback">Back</button><button class="btn go" id="nrnext">Next</button></div>
 </div></div>
 
@@ -753,8 +762,21 @@ body.touch #hint{bottom:auto;top:64px}
   <input id="nickin" class="nickin" maxlength="16" autocomplete="off" spellcheck="false" placeholder="YourName"><p class="nickerr" id="nickerr"></p>
   <div class="row"><button class="btn" data-close>Later</button><button class="btn go" id="nickok">Save</button></div>
 </div></div>
+<div id="redeem" class="screen modal"><div class="box" style="width:min(420px,92vw)">
+  <h2>Redeem code</h2><p class="sub">Gift codes give gems. Invite codes unlock Brutal early access.</p>
+  <input id="redeemin" class="nickin" maxlength="24" autocomplete="off" spellcheck="false" placeholder="CODE"><p class="nickerr" id="redeemmsg"></p>
+  <div class="row"><button class="btn" data-close>Close</button><button class="btn go" id="redeemok">Redeem</button></div>
+</div></div>
+<div id="rewards" class="screen modal"><div class="box" style="width:min(760px,96vw)">
+  <h2>Rewards</h2><div id="rwbody"></div>
+  <div class="row"><button class="btn go" data-close>Close</button></div>
+</div></div>
+<div id="seasonwin" class="screen modal"><div class="box" style="width:min(480px,94vw)">
+  <h2>Season results</h2><div id="swbody"></div>
+  <div class="row"><button class="btn go" data-close>Awesome</button></div>
+</div></div>
 <div id="leader" class="screen modal"><div class="box" style="width:min(640px,94vw)">
-  <h2>Leaderboard</h2><p class="sub">Each player's best run: highest stage first, then the fastest time.</p>
+  <h2>Leaderboard</h2><div class="tabs seg" id="lbtabs"><button data-t="all" class="on">All time</button><button data-t="season">Brutal season</button><button data-t="fame">Hall of Fame</button></div><p class="sub" id="lbsub"></p>
   <div id="lbody"></div>
   <div class="row"><button class="btn go" data-close>Close</button></div>
 </div></div>

@@ -31,6 +31,7 @@ import { coreDef } from './kits.js';
 import { smithSprite } from './gfx/forge.js';
 import { snapshotRun, restoreRun, validRun } from './runsave.js';
 import { initCoop, openCoop, coopTick, queueCmd, CO, leave as leaveCoop } from './coop.js';
+import * as SU from './seasonui.js';
 
 const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
@@ -258,8 +259,8 @@ function renderShop() {
     const grid = document.createElement('div'); grid.className = 'fxgrid'; B.appendChild(grid);
     for (const t of PR.TRAILS) {
       const own = PR.ownsTrail(t.id), eq = PR.P.trail === t.id, d = document.createElement('div'); d.className = 'fxcard' + (eq ? ' eq' : '') + (t.exclusive ? ' excl' : '');
-      d.innerHTML = '<div class="fxhead">' + (t.exclusive ? '<span class="fxtag">Victory</span>' : '') + (eq ? '<span class="fxtag on">Equipped</span>' : '') + '</div><canvas width="96" height="40"></canvas><b>' + t.name + '</b>';
-      const bt = document.createElement('button'); bt.className = 'skbuy' + (own || eq ? '' : ' buy'); bt.innerHTML = eq ? 'Equipped' : own ? 'Equip' : t.exclusive ? 'Win a run' : GEM(14) + t.price; bt.disabled = eq || (!own && t.exclusive);
+      d.innerHTML = '<div class="fxhead">' + (t.exclusive ? '<span class="fxtag">' + (t.how ? 'Exclusive' : 'Victory') + '</span>' : '') + (eq ? '<span class="fxtag on">Equipped</span>' : '') + '</div><canvas width="96" height="40"></canvas><b>' + t.name + '</b>';
+      const bt = document.createElement('button'); bt.className = 'skbuy' + (own || eq ? '' : ' buy'); bt.innerHTML = eq ? 'Equipped' : own ? 'Equip' : t.exclusive ? (t.how || 'Win a run') : GEM(14) + t.price; bt.disabled = eq || (!own && t.exclusive);
       bt.onclick = () => { if (own) PR.equipTrail(t.id); else if (!PR.buyTrail(t.id)) return showShopMsg('Not enough gems.'); applyTrail(); renderShop(); };
       d.appendChild(bt); grid.appendChild(d); FXV.push({ c: d.querySelector('canvas'), id: t.id, ph: Math.random() });
     }
@@ -359,7 +360,7 @@ function renderChests(B) {
   $('or1').onclick = () => go('croyal', PR.openRoyal(1));
 }
 function showShopMsg(s) { const p = document.createElement('p'); p.style.color = 'var(--bad)'; p.textContent = s; $('shopbody').prepend(p); setTimeout(() => p.remove(), 1600); }
-function applyTrail() { const t = PR.TRAILS.find(x => x.id === PR.P.trail); R.opts.trail = t && t.c ? t.c : null; }
+function applyTrail() { const t = PR.TRAILS.find(x => x.id === PR.P.trail); R.opts.trail = t && t.c ? t.c : null; R.opts.aura = t && t.aura ? t.aura : null; }
 applyTrail();
 function GEM(s) { return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="M7.5 3.5h9L20 9l-8 12.5L4 9z" fill="#0ea5e9"/><path d="M7.5 3.5h9L20 9H4z" fill="#7dd3fc"/><path d="M4 9h5l3 12.5z" fill="#38bdf8"/><path d="M20 9h-5l-3 12.5z" fill="#0284c7"/><path d="M9 9l3-5.5L15 9z" fill="#bae6fd"/><path d="M7.5 3.5h9L20 9l-8 12.5L4 9z" fill="none" stroke="#082f49" stroke-width=".9" stroke-linejoin="round"/></svg>`; }
 const FLAME = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f2a33a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg>`;
@@ -496,7 +497,7 @@ document.addEventListener('click', e => {
   else if (act === 'coop') openCoop();
   else if (act === 'shop') openShop();
   else if (act === 'daily') openDaily();
-  else if (act === 'leader') openLeader();
+  else if (act === 'leader') SU.openBoard();
   else if (act === 'settings') openSettings();
   else if (act === 'fullscreen') { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { try { screen.orientation.lock('landscape'); } catch (e) { /* trình duyệt không cho khoá */ } }).catch(() => {}); }
   else if (act === 'controls') { renderControls(); openModal('controls'); }
@@ -655,10 +656,11 @@ function renderNewRun() {
     b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nrEl = el; renderNewRun(); } };
     E.appendChild(b);
   }
-  for (const x of $('diffseg').children) x.classList.toggle('on', x.dataset.d === nrDiff);
+  if (nrDiff === 'HARD' && !SU.brutalOk()) nrDiff = 'NORMAL';
+  for (const x of $('diffseg').children) { x.classList.toggle('on', x.dataset.d === nrDiff); x.classList.toggle('locked', x.dataset.d === 'HARD' && !SU.brutalOk()); }
   syncControl();
 }
-for (const x of $('diffseg').children) x.onclick = () => { nrDiff = x.dataset.d; renderNewRun(); };
+for (const x of $('diffseg').children) x.onclick = () => { if (x.dataset.d === 'HARD' && !SU.brutalOk()) return SU.openRewards('HARD'); nrDiff = x.dataset.d; renderNewRun(); };
 $('nrnext').onclick = () => { if (nrStep === 1) { nrStep = 2; renderNewRun(); } else startRun({ cls: nrCls, element: nrEl, difficulty: nrDiff }); };
 $('nrback').onclick = () => { if (nrStep === 2) { nrStep = 1; renderNewRun(); } else closeModal('newrun'); };
 
@@ -1054,7 +1056,7 @@ function showVictory() {
   $('vsub').innerHTML = '<b>' + CLASSES[cls].name + '</b> broke all five titans' + (g.difficulty === 'HARD' ? '<span class="hard">BRUTAL</span>' : '');
   const S = [[tm, v => Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0'), 'clear time'], [g.kills, v => v, 'kills'], [g.stats.dmg, v => v >= 1000 ? Math.round(v / 1000) + 'k' : v, 'damage'], [g.discovered.size, v => v, 'skills used']];
   $('vstats').innerHTML = S.map(s => '<div><b>0</b><span>' + s[2] + '</span></div>').join(''); [...$('vstats').children].forEach((c, i) => countUp(c.querySelector('b'), S[i][0], S[i][1], 900));
-  const cards = ['<div class="vcard rare"><div class="vk">Gems earned</div><div class="vg">' + GEM(26) + '<span class="vgn">0</span></div><div class="vd">' + (R0.bonus.length ? R0.bonus.map(b => b[0] + ' +' + b[1]).join('<br>') : 'Victory bonus') + '</div></div>'];
+  const cards = ['<div class="vcard rare"><div class="vk">Gems earned</div><div class="vg">' + GEM(26) + '<span class="vgn">0</span></div><div class="vd">' + (R0.bonus.length ? R0.bonus.map(b => b[0] + ' +' + b[1]).join('<br>') : 'Victory bonus') + (g.difficulty === 'HARD' && SU.brutalOk() ? '<br>Season points +' + SU.seasonPoints(25, true, Math.round(g.t)) : '') + '</div></div>'];
   for (const u of R0.unlocks) cards.push(u.kind === 'skin' ? '<div class="vcard rare" data-skin="1"><div class="vk">Exclusive skin</div><div class="vprev"></div><div class="vn">' + u.name + '</div><div class="vd">Only earned by victory</div></div>' : '<div class="vcard rare"><div class="vk">Exclusive dash</div><div class="vg" style="color:#7fe0ff">⟡</div><div class="vn">' + u.name + '</div><div class="vd">Only earned by victory</div></div>');
   for (const a of R0.ach || []) cards.push('<div class="vcard"><div class="vk">Achievement</div><div class="vg">' + PXI('trophy', 32) + '</div><div class="vn">' + a.text + '</div></div>');
   $('vrewards').innerHTML = cards.join(''); [...$('vrewards').children].forEach((c, i) => c.style.animationDelay = (0.5 + i * 0.25) + 's');
@@ -1160,7 +1162,7 @@ if (!document.documentElement.requestFullscreen) document.querySelectorAll('[dat
 
 // nút đóng: mọi bảng dùng nút X ở góc trên bên phải (luôn dính trên cùng khi cuộn), bỏ nút đóng ở cuối trang
 const PX_X = '<svg viewBox="0 0 7 7" width="14" height="14" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h2v1H0zM1 1h2v1H1zM2 2h3v1H2zM3 3h1v1H3zM2 4h3v1H2zM1 5h2v1H1zM0 6h2v1H0zM5 0h2v1H5zM4 1h2v1H4zM4 5h2v1H4zM5 6h2v1H5z"/></svg>';
-for (const [mid, sel] of [['leader', '[data-close]'], ['settings', '[data-close]'], ['controls', '[data-close]'], ['shop', '[data-close]'], ['bag', '#bagclose'], ['smith', '#smithclose']]) {
+for (const [mid, sel] of [['leader', '[data-close]'], ['redeem', '[data-close]'], ['rewards', '[data-close]'], ['seasonwin', '[data-close]'], ['settings', '[data-close]'], ['controls', '[data-close]'], ['shop', '[data-close]'], ['bag', '#bagclose'], ['smith', '#smithclose']]) {
   const box = document.querySelector('#' + mid + ' .box'), orig = box && box.querySelector('.row ' + sel); if (!orig) continue;
   const x = document.createElement('button'); x.className = 'qclose xclose'; x.setAttribute('aria-label', 'Close'); x.title = orig.textContent.trim(); x.innerHTML = PX_X;
   x.onclick = e => { e.stopPropagation(); orig.click(); }; box.prepend(x);
@@ -1207,8 +1209,8 @@ PR.onChange(() => { if (!syncUser) return; clearTimeout(pushT); pushT = setTimeo
 addEventListener('pagehide', () => { if (pushT) pushNow(); });
 renderContinue();
 const fmtTime = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-async function openLeader() {
-  openModal('leader'); const B = $('lbody'); B.innerHTML = '<p class="sub">Loading…</p>';
+async function renderAllTime(B) {
+  B.innerHTML = '<p class="sub">Loading…</p>';
   const r = await ON.fetchLeaderboard(50), me = ON.state().user ? ON.state().user.id : null;
   if (r.error) { B.innerHTML = '<p class="sub">Could not load the leaderboard. Check your connection.</p>'; return; }
   if (!r.rows.length) { B.innerHTML = '<p class="sub">No runs yet. Be the first!</p>'; return; }
@@ -1216,4 +1218,5 @@ async function openLeader() {
   B.innerHTML = '<table class="lb"><thead><tr><th>Rank</th><th>Player</th><th>Hero</th><th>Reached</th><th>Time</th></tr></thead><tbody>' + r.rows.map(row).join('') + (r.me ? '<tr class="gap"><td colspan="5">…</td></tr>' + row(r.me) : '') + '</tbody></table>' + (!me ? '<p class="sub" style="margin-top:10px">Sign in with Google to post your runs.</p>' : '');
 }
 ON.onOnline(s => { renderAcct(s); syncProfile(s); });
+SU.initSeasonUI({ openModal, closeModal, showHint, renderAllTime, refreshGems: () => { for (const id of ['titlegems', 'shopgems']) if ($(id)) setGems($(id), PR.P.gems); }, onAccess: () => { if (modals.includes('newrun')) renderNewRun(); } });
 ON.initOnline();

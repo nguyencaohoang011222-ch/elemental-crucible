@@ -5,7 +5,7 @@ const store = (() => { try { return window.localStorage; } catch (e) { return nu
 const today = () => new Date().toISOString().slice(0, 10);
 
 export const ECON = {
-  bossFirst: 25, bossRepeat: 3, perStages: 3, winBonus: 40, firstWin: 100, firstClassWin: 40, hardWin: 60, eliteChance: 0.15, eliteGems: 2,
+  bossFirst: 25, bossRepeat: 3, perStages: 3, winBonus: 40, firstWin: 100, firstClassWin: 40, hardWin: 150, eliteChance: 0.15, eliteGems: 2,
   login: [5, 5, 8, 8, 10, 10, 25], reroll: [5, 8, 12, 16, 20], revive: 30, chest: 40, chestRefund: 20
 };
 // ---------- skin theo hạng ----------
@@ -80,7 +80,27 @@ export function rollBossShard(bossId, rand = Math.random) {
 }
 // mảnh ngẫu nhiên (boss bất kỳ, tướng bất kỳ còn thiếu skin) cho rương; null nếu đã có đủ mọi skin boss
 function randomShard(rand) { const opts = Object.keys(BOSS_SKINS).flatMap(b => shardOpen(b).map(c => [b, c])); if (!opts.length) return null; const [b, c] = opts[Math.floor(rand() * opts.length)]; return addShard(b, c); }
-export const TRAILS = [{ id: '', name: 'None', price: 0 }, { id: 'crown', name: 'Crown Lightning', price: 0, exclusive: true, c: ['#7fe0ff', '#ffe27a'] }, { id: 'flame', name: 'Flame Dash', price: 50, c: ['#ff7a3c', '#ffd36b'] }, { id: 'stars', name: 'Stardust Dash', price: 50, c: ['#ffffff', '#ffe27a'] }, { id: 'leaves', name: 'Leaf Dash', price: 50, c: ['#6aa84c', '#a8e070'] }];
+export const TRAILS = [{ id: '', name: 'None', price: 0 }, { id: 'crown', name: 'Crown Lightning', price: 0, exclusive: true, c: ['#7fe0ff', '#ffe27a'] }, { id: 'flame', name: 'Flame Dash', price: 50, c: ['#ff7a3c', '#ffd36b'] }, { id: 'stars', name: 'Stardust Dash', price: 50, c: ['#ffffff', '#ffe27a'] }, { id: 'leaves', name: 'Leaf Dash', price: 50, c: ['#6aa84c', '#a8e070'] },
+  // độc quyền Brutal: không mua được, không ra từ rương. aura: vòng sáng dưới chân luôn bật khi trang bị
+  { id: 'brutal', name: 'Brutal Ember', price: 0, exclusive: true, c: ['#ff2a1a', '#2a0806'], aura: '#ff3a2a', how: 'First Brutal victory' },
+  { id: 'champion', name: 'Season Champion', price: 0, exclusive: true, c: ['#ffe27a', '#b47ae8'], aura: '#ffd34a', how: 'Brutal season #1' },
+  { id: 'silver', name: 'Silver Crest', price: 0, exclusive: true, c: ['#f4f4f8', '#9aa4c0'], aura: '#d8dce8', how: 'Brutal season #2' },
+  { id: 'bronze', name: 'Bronze Crest', price: 0, exclusive: true, c: ['#e8a060', '#8a5a2a'], aura: '#d08a4a', how: 'Brutal season #3' }];
+// phần thưởng Brutal theo thứ tự (hiện trong bảng phần thưởng ở New Run); gem và vệt độc quyền được cấp ở runEnded / claimSeason
+export const SEASON_REWARDS = [
+  { rank: 1, trail: 'champion', gems: 1000, title: 'Season Champion', extra: 'Hall of Fame + invitation to design your own skin effect' },
+  { rank: 2, trail: 'silver', gems: 500, title: 'Silver' },
+  { rank: 3, trail: 'bronze', gems: 300, title: 'Bronze' },
+  { rank: 10, gems: 120, title: 'Top 10', extra: 'Season badge' }];
+// nhận thưởng mùa n với hạng rank (mỗi mùa một lần). Trả về danh sách quà vừa nhận, hoặc null nếu đã nhận / không có quà.
+export function claimSeason(n, rank) {
+  P.seasons = P.seasons || {}; if (P.seasons[n] || !(rank > 0)) return null;
+  const r = SEASON_REWARDS.find(x => rank <= x.rank); P.seasons[n] = { rank, at: Date.now() }; if (!r) { save(); return null; }
+  const got = { n, rank, gems: r.gems, title: r.title, extra: r.extra || '', trail: null };
+  P.gems += r.gems; if (r.trail && !P.trails.includes(r.trail)) { P.trails.push(r.trail); got.trail = TRAILS.find(t => t.id === r.trail); }
+  if (rank <= 10) { P.badges = P.badges || []; if (!P.badges.includes('S' + n)) P.badges.push('S' + n); }
+  save(); return got;
+}
 const QUESTS = [
   { id: 'kills', text: 'Defeat 60 enemies', goal: 60, reward: 2 }, { id: 'stages', text: 'Clear 6 stages', goal: 6, reward: 2 },
   { id: 'elites', text: 'Defeat 2 elite enemies', goal: 2, reward: 3 }, { id: 'bosses', text: 'Defeat a titan', goal: 1, reward: 3 },
@@ -141,7 +161,7 @@ export function runEnded(stage, won, cls) {
     const firstEver = P.stats.wins === 1, firstClass = !P.skins.includes(cls + ':titanslayer');
     if (firstEver) { n += ECON.firstWin; bonus.push(['First victory', ECON.firstWin]); if (!P.trails.includes('crown')) { P.trails.push('crown'); unlocks.push({ kind: 'trail', id: 'crown', name: 'Crown Lightning' }); } }
     if (firstClass) { n += ECON.firstClassWin; bonus.push(['First win as this hero', ECON.firstClassWin]); P.skins.push(cls + ':titanslayer'); unlocks.push({ kind: 'skin', cls, id: 'titanslayer', name: 'Titanslayer' }); }
-    if (arguments[3] === 'HARD') { n += ECON.hardWin; bonus.push(['Brutal difficulty', ECON.hardWin]); }
+    if (arguments[3] === 'HARD') { n += ECON.hardWin; bonus.push(['Brutal victory', ECON.hardWin]); if (!P.trails.includes('brutal')) { P.trails.push('brutal'); unlocks.push({ kind: 'trail', id: 'brutal', name: 'Brutal Ember' }); } }
   }
   P.gems += n; const got = track('runs', 0); save(); return { gems: n, ach: got, unlocks, bonus };
 }
