@@ -58,6 +58,7 @@ export async function check({ area = 'all', only = null, seeds = 3 } = {}) {
     for (const [i, c] of classes.entries()) add('progress', c + ' Normal good bot progress', ng[i], T.progress.normalGood, T.progress.weight);
     if (classes.length > 1) add('progress', 'hero spread (best/worst)', Math.max(...ng) / Math.max(0.1, Math.min(...ng)), [1, T.progressSpread.max], T.progressSpread.weight);
     add('brutal', 'Brutal / Normal progress (good bot)', mean(classes.map(c => pg(c, 'HARD', 'good'))) / Math.max(0.1, mean(ng)), T.brutal.ratio, T.brutal.weight);
+    if (T.elite) { const gs = classes.map(c => G[c + '|NORMAL|good']).filter(Boolean), tt = gs.filter(x => x.eliteTTK !== null); if (tt.length) add('elite', 'elite time to kill, good bot Normal (s)', mean(tt.map(x => x.eliteTTK)), T.elite.ttk, T.elite.weight); add('elite', 'share of non-boss damage taken near elites', mean(gs.map(x => x.eliteShare)), T.elite.share, T.elite.weight); }
     if (T.skillGap.weight) add('skillGap', 'good / novice progress (Normal)', mean(ng) / Math.max(0.1, mean(classes.map(c => pg(c, 'NORMAL', 'novice')))), [T.skillGap.min, 99], T.skillGap.weight);
   }
 
@@ -74,7 +75,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('tools/tune/
   if (a.includes('--json')) console.log(JSON.stringify(r, null, 1));
   else {
     const bad = r.items.filter(i => !i.ok).sort((x, y) => y.score - x.score);
-    for (const grp of ['merge', 'bossFloor', 'stagger', 'strategy', 'bossTime', 'progress', 'brutal', 'skillGap']) for (const i of r.items.filter(i => i.group === grp)) console.log((i.ok ? ' ok ' : 'OFF ') + i.name.padEnd(40), String(i.value).padStart(7), ' target ' + i.band.join('–'), i.ok ? '' : ' +' + i.score);
+    for (const grp of ['merge', 'bossFloor', 'stagger', 'strategy', 'elite', 'bossTime', 'progress', 'brutal', 'skillGap']) for (const i of r.items.filter(i => i.group === grp)) console.log((i.ok ? ' ok ' : 'OFF ') + i.name.padEnd(40), String(i.value).padStart(7), ' target ' + i.band.join('–'), i.ok ? '' : ' +' + i.score);
     const sk = r.items.filter(i => i.group === 'skill'); console.log(' ' + sk.filter(i => i.ok).length + '/' + sk.length + ' skills within ' + JSON.stringify(sk[0]?.band) + ' x their tier median (fight value per energy)');
     for (const i of sk.filter(i => !i.ok).sort((x, y) => y.score - x.score)) console.log('OFF ' + i.name.padEnd(40), String(i.value).padStart(7), ' (value ' + i.raw + ', median ' + i.median + ', cost ' + i.cost + ')  +' + i.score);
     if (r.unmeasured.length) console.log(' not measurable in the fight bench (no damage, control or protection on their own, e.g. needs basic attacks): ' + r.unmeasured.join(', '));

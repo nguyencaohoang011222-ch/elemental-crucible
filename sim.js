@@ -348,11 +348,12 @@ export class Sim {
       if (d.ai === 'melee') {
         const fl = e.flank || 0; // ở xa: đi tới điểm lệch quanh người chơi (vòng hai bên), gần thì lao thẳng
         e.ma = dp > 120 && fl ? Math.atan2(p.y - Math.sin(toP + fl) * 90 - e.y, p.x - Math.cos(toP + fl) * 90 - e.x) : toP + Math.sin(this.t * 2 + e.id) * 0.3;
+        if (d.elite && this.eliteSteer) { const s = this.eliteSteer(e, d, dp, toP); if (s !== null) e.ma = s; }   // elite: lối tiếp cận riêng (gameenv.js eliteSteer)
         if (dp > d.r + p.r + 4) step(d.speed);
         if (dp < d.r + p.r + 8 && e.atkCd <= 0) { e.atkCd = 0.9; this.hurtPlayer(d.dmg, toP); if (d.onHit && this.enemyHit) this.enemyHit(e, d); }
       } else if (d.ai === 'charger') {
-        if (e.state === 'move') { e.ma = toP; if (dp > 140) step(d.speed); if (dp < 330 && e.st <= 0 && this.gate(e)) { e.state = 'tele'; e.st = 0.62; e.ta = toP; this.emit('tele', { x: e.x, y: e.y, a: e.ta }); } }
-        else if (e.state === 'tele') { e.ta += angDiff(toP, e.ta) * Math.min(1, dt * 1.2); if (e.st <= 0) { e.state = 'charge'; e.st = 0.42; e.hitP = false; } }
+        if (e.state === 'move') { e.ma = toP; if (d.elite && this.eliteSteer) { const s = this.eliteSteer(e, d, dp, toP); if (s !== null) e.ma = s; } if (dp > 140 || d.elite) step(d.speed); if (dp < 330 && e.st <= 0 && (!d.elite || e.ready) && this.gate(e)) { e.state = 'tele'; e.st = 0.62; e.ta = toP; this.emit('tele', { x: e.x, y: e.y, a: e.ta }); } }
+        else if (e.state === 'tele') { const v = d.elite ? (this.pv || { x: 0, y: 0 }) : null, aim = v ? Math.atan2(p.y + v.y * 0.35 - e.y, p.x + v.x * 0.35 - e.x) : toP; e.ta += angDiff(aim, e.ta) * Math.min(1, dt * (d.elite ? 2.4 : 1.2)); if (e.st <= 0) { e.state = 'charge'; e.st = 0.42; e.hitP = false; } }   // elite nhắm chỗ người chơi sắp tới
         else if (e.state === 'charge') {
           e.x += Math.cos(e.ta) * (d.dash || 560) * dt; e.y += Math.sin(e.ta) * (d.dash || 560) * dt;
           if (!e.hitP && dp < d.r + p.r + 4) { e.hitP = true; this.hurtPlayer(d.dmg, e.ta); }
@@ -360,8 +361,9 @@ export class Sim {
           else if (e.st <= 0) { e.state = 'stagger'; e.st = 0.7; }
         } else if (e.state === 'stagger') { if (e.st <= 0) { e.state = 'move'; e.st = 1.2 + this.rand(); } }
       } else if (d.ai === 'shooter') {
-        const want = 290;
+        const want = d.elite ? 380 : 290;
         e.ma = dp > want + 40 ? toP : dp < want - 40 ? toP + Math.PI : toP + Math.PI / 2 * (e.id % 2 ? 1 : -1);
+        if (d.elite && this.eliteSteer) { const s = this.eliteSteer(e, d, dp, toP); if (s !== null) e.ma = s; }
         if (e.state === 'move') { step(d.speed * (dp < want - 40 ? 1.1 : 0.7)); if (dp < 520 && e.st <= 0 && this.gate(e)) { e.state = 'tele'; e.st = 0.55; e.ta = toP; }
           if (e.follow > 0) { e.follow -= dt; if (e.follow <= 0) { const v = this.pv || { x: 0, y: 0 }, a = Math.atan2(p.y + v.y * 0.6 - e.y, p.x + v.x * 0.6 - e.x); this.foes.push({ x: e.x, y: e.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, life: 2.4, dmg: d.dmg, r: 7, kind: d.shot, c: d.color }); this.emit('cast', { x: e.x, y: e.y }); } } }
         else if (e.state === 'tele') { e.ta = toP; if (e.st <= 0) { if (!(this.enemyCast && this.enemyCast(e, d))) { for (const off of [-0.18, 0, 0.18]) this.foes.push({ x: e.x, y: e.y, vx: Math.cos(e.ta + off) * 260, vy: Math.sin(e.ta + off) * 260, life: 2.6, dmg: d.dmg, r: 7, kind: d.shot, c: d.color }); this.emit('cast', { x: e.x, y: e.y }); if (d.followup) e.follow = 0.45; } e.state = 'move'; e.st = 1.8 + this.rand() * 0.8; } }

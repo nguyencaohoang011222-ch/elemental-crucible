@@ -1,7 +1,7 @@
 // Nối môi trường vào trận đấu: mặt đất ảnh hưởng mọi sinh vật, chiêu tác động lên mặt đất,
 // năng lực riêng của quái từng vùng, nấm nổ, bẫy trần, mạch phun.
 import { ENEMIES, dist, angDiff } from './sim.js';
-import { Surface, SURF_FX, SURF_FX_E, ROSTER, ELITES, mapHazards, WARN } from './env.js';
+import { Surface, SURF_FX, SURF_FX_E, ROSTER, ELITES, mapHazards, WARN, ELITE } from './env.js';
 import { foeAI, FOE_AIS, trackPV, splitFoe } from './foes.js';
 
 const PROJ = new Set(['arrow', 'pierce', 'orb', 'sbolt', 'sarrow', 'crescent', 'shard', 'cyclone']);
@@ -160,7 +160,11 @@ export function foeLand(g, f) {
 function assassin(g, e, d, dt) {
   const p = g.p, dp = dist(e.x, e.y, p.x, p.y), toP = Math.atan2(p.y - e.y, p.x - e.x);
   if (e.freeze > 0 || e.stun > 0) { e.alpha = 1; return; }
-  if (e.state === 'move') { e.alpha = 1; if (dp > 200) { e.x += Math.cos(toP) * d.speed * dt; e.y += Math.sin(toP) * d.speed * dt; } if (dp < 320 && e.st <= 0 && g.gate(e)) { e.state = 'vanish'; e.st = 0.45; g.emit('tele', { x: e.x, y: e.y }); } }
+  if (e.state === 'move' && d.elite) { e.alpha = 1; let a = dp > 260 ? toP : dp < 180 ? toP + Math.PI : toP + Math.PI / 2 * (e.id % 2 ? 1 : -1);
+    for (const s of g.shots) if (dist(s.x, s.y, e.x, e.y) < 110) { a = Math.atan2(s.vy || 0, s.vx || 0) + Math.PI / 2 * (e.id % 2 ? 1 : -1); break; }   // né đạn
+    e.x += Math.cos(a) * d.speed * dt; e.y += Math.sin(a) * d.speed * dt; g.world.collide(e, d.r);
+    if (dp < 320 && e.st <= 0 && g.gate(e)) { e.state = 'vanish'; e.st = 0.45; g.emit('tele', { x: e.x, y: e.y }); } }
+  else if (e.state === 'move') { e.alpha = 1; if (dp > 200) { e.x += Math.cos(toP) * d.speed * dt; e.y += Math.sin(toP) * d.speed * dt; } if (dp < 320 && e.st <= 0 && g.gate(e)) { e.state = 'vanish'; e.st = 0.45; g.emit('tele', { x: e.x, y: e.y }); } }
   else if (e.state === 'vanish') {
     e.alpha = Math.max(0, e.st / 0.45);
     if (e.st <= 0) {
@@ -175,23 +179,44 @@ function assassin(g, e, d, dt) {
   } else if (e.state === 'windup') { if (e.st <= 0) { e.state = 'move'; e.st = 2.4 + g.rand(); } }
   else if (e.state === 'stagger') { e.alpha = 1; if (e.st <= 0) { e.state = 'move'; e.st = 1; } }
 }
+// ---------- quái tinh anh: lối tiếp cận riêng, không đi thẳng như lính thường ----------
+// trả về hướng đi (radian) hoặc null (giữ hướng mặc định). Chỉ đọc trạng thái mô phỏng → tất định.
+export function eliteSteer(g, e, d, dp, toP) {
+  const p = g.p, sk = d.skill;
+  if (sk === 'quake') { // Ember Hulk: vòng ra sau lưng hướng ngắm của người chơi rồi mới áp sát
+    if (dp < 130) return null; const bx = p.x - Math.cos(p.aim || 0) * 120, by = p.y - Math.sin(p.aim || 0) * 120;
+    const ab = Math.atan2(by - e.y, bx - e.x); if (dist(e.x, e.y, bx, by) < dp) return ab;   // điểm sau lưng ở gần hơn người chơi: đi thẳng tới
+    const df = angDiff(ab, toP), side = Math.abs(df) > 0.05 ? Math.sign(df) : (e.id % 2 ? 1 : -1); return toP + side * 1.05; }   // còn không thì đi vòng một bên
+  if (sk === 'brood') { // Spore Mother: núp sau bầy lính, giữ ~260px
+    let sh = null, sd = 1e9; for (const o of g.enemies) { if (o === e || o.dead || o.boss || ENEMIES[o.type].elite) continue; const q = dist(o.x, o.y, p.x, p.y); if (q < sd && q > 120) { sd = q; sh = o; } }
+    if (sh) { const a = Math.atan2(sh.y - p.y, sh.x - p.x), tx = sh.x + Math.cos(a) * 70, ty = sh.y + Math.sin(a) * 70; if (dist(e.x, e.y, tx, ty) > 24) return Math.atan2(ty - e.y, tx - e.x); }
+    return dp < 230 ? toP + Math.PI : dp > 300 ? toP : toP + Math.PI / 2 * (e.id % 2 ? 1 : -1); }
+  if (sk === 'frostbeam') { // Rime Seer: thả diều xa, bị ngắm thẳng vào thì dạt ngang
+    if (dp < 340) return null; const aimed = Math.abs(angDiff(p.aim || 0, Math.atan2(e.y - p.y, e.x - p.x))) < 0.3; return aimed ? toP + Math.PI / 2 * (e.id % 2 ? 1 : -1) : null; }
+  if (sk === 'rampage') { // Inferno Brute: chạy tới điểm chéo bên hông rồi mới húc
+    const s = e.id % 2 ? 1 : -1; if (e.flA == null) e.flA = Math.atan2(e.y - p.y, e.x - p.x) + s * 1.2;   // chốt góc chéo một lần cho mỗi cú húc
+    const fx = p.x + Math.cos(e.flA) * 230, fy = p.y + Math.sin(e.flA) * 230;
+    e.ready = dist(e.x, e.y, fx, fy) < 70 || dp > 420; return e.ready ? toP : Math.atan2(fy - e.y, fx - e.x); }
+  return null;
+}
+const skillRange = d => ({ quake: 260, frostbeam: 900, brood: 420, mirror: 420, rampage: 520 })[d.skill] * ELITE.reach;
 // ---------- quái tinh anh: mỗi map một chiêu riêng (bản mini của boss) ----------
 export function eliteFor(theme) { return ELITES[theme] || ELITES.forest; }
 function eliteSkill(g, e, d) {
-  const p = g.p, a = Math.atan2(p.y - e.y, p.x - e.x), dm = g.dmgScale;
+  const p = g.p, a = Math.atan2(p.y - e.y, p.x - e.x), dm = g.dmgScale * ELITE.dmg;   // chiêu elite mạnh theo cùng hệ số
   g.emit('eliteCast', { x: e.x, y: e.y, name: d.name });
   if (d.skill === 'quake') { // đập đất: vòng sóng có khe + để lại lửa
-    const x = e.x + Math.cos(a) * 70, y = e.y + Math.sin(a) * 70;
+    const reach = Math.min(dist(e.x, e.y, p.x, p.y), 180 * ELITE.reach), x = e.x + Math.cos(a) * reach, y = e.y + Math.sin(a) * reach;
     g.hazards.push({ kind: 'circle', x, y, r: 115, t: 0.95, T: 0.95, hold: 0, dmg: 26 * dm, color: '#ff5a2a', owner: null, shock: { speed: 300, max: 300, thick: 22, dmg: 14 * dm }, after: () => applyEl(g, x, y, 70, 'BURN', { life: 3 }) });
   } else if (d.skill === 'frostbeam') { // tia băng rộng bằng người, xuyên cả map; trúng thì đóng băng
     g.hazards.push({ kind: 'rect', x: e.x + Math.cos(a) * 1200, y: e.y + Math.sin(a) * 1200, a, len: 2400, width: 46, t: 1.2, T: 1.2, hold: 0, dmg: 22 * dm, color: '#3a8aff', owner: null, stunP: 1.0, after: () => { for (let k = 1; k < 14; k++) applyEl(g, e.x + Math.cos(a) * k * 90, e.y + Math.sin(a) * k * 90, 26, 'ICE', { life: 6 }); g.emit('frostBeam', { x: e.x, y: e.y, a }); } });
     e.st = Math.max(e.st, 1.6);
   } else if (d.skill === 'brood') { // rải lính nấm mini từ lưng + nổ mây độc
-    for (let k = 0; k < 3; k++) { const q = g.rand() * 6.28; const m = g.spawnAt('MINISPORE', e.x + Math.cos(q) * 70, e.y + Math.sin(q) * 70); m.spawn = 0.6; g.emit('dropMinion', { x1: e.x, y1: e.y - 40, x2: m.x, y2: m.y }); }
+    for (let k = 0; k < 3; k++) { const q = a + (g.rand() - 0.5) * 1.2, r = 110 * ELITE.reach; const m = g.spawnAt('MINISPORE', e.x + Math.cos(q) * r, e.y + Math.sin(q) * r); m.spawn = 0.6; g.emit('dropMinion', { x1: e.x, y1: e.y - 40, x2: m.x, y2: m.y }); }
     applyEl(g, e.x, e.y, 90, 'POISON', { life: 5 }); g.emit('sporeBurst', { x: e.x, y: e.y, r: 90 });
   } else if (d.skill === 'mirror') { // phân thân 2 ảo ảnh + chém lướt chéo
     for (let k = 0; k < 2; k++) { const q = a + (k ? 2.1 : -2.1); const m = g.spawnAt('ILLUSION', p.x + Math.cos(q) * 160, p.y + Math.sin(q) * 160); m.life = 7; m.st = 0.2; }
-    g.hazards.push({ kind: 'line', x: e.x, y: e.y, a, len: 420, width: 50, t: 0.7, T: 0.7, hold: 0, dmg: 24 * dm, color: '#b07aff', owner: null, after: () => { e.x += Math.cos(a) * 380; e.y += Math.sin(a) * 380; g.world.collide(e, e.r); g.emit('bossBlink', { x: e.x, y: e.y }); } });
+    g.hazards.push({ kind: 'line', x: e.x, y: e.y, a, len: 420 * ELITE.reach, width: 50, t: 0.7, T: 0.7, hold: 0, dmg: 24 * dm, color: '#b07aff', owner: null, after: () => { e.x += Math.cos(a) * 380 * ELITE.reach; e.y += Math.sin(a) * 380 * ELITE.reach; g.world.collide(e, e.r); g.emit('bossBlink', { x: e.x, y: e.y }); } });
   } else if (d.skill === 'rampage') { e.chain = 3; e.state = 'tele'; e.st = 0.45; e.ta = a; } // húc liên tục 3 cú
 }
 export function enemiesExtra(g, dt) {
@@ -204,7 +229,8 @@ export function enemiesExtra(g, dt) {
     if (d.illusion) { e.life = (e.life ?? 7) - dt; if (e.life <= 0) { e.dead = true; g.emit('kill', { x: e.x, y: e.y, type: e.type }); } }
     if (d.elite && !e.spawn && e.freeze <= 0 && e.stun <= 0) {
       e.skillT = (e.skillT ?? 2.5) - dt;
-      if (e.skillT <= 0) { e.skillT = 4.5 + g.rand() * 1.5; eliteSkill(g, e, d); }
+      if (e.skillT <= 0) { if (dist(e.x, e.y, g.p.x, g.p.y) <= skillRange(d)) { e.skillT = 4.5 + g.rand() * 1.5; eliteSkill(g, e, d); } else e.skillT = 0.5; }
+      if (d.skill === 'rampage' && e.state !== 'move') e.flA = null;
       if (d.skill === 'rampage' && e.chain > 0 && e.state === 'stagger' && e.st < 0.55) { e.chain--; e.state = 'tele'; e.st = 0.32; e.ta = Math.atan2(g.p.y - e.y, g.p.x - e.x); }
     }
   }

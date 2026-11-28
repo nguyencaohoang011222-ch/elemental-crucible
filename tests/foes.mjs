@@ -155,5 +155,5 @@ const evs = g => g.events.map(e => e.ev);
   ok(Math.round(h.max) === 207, 'Test Lab: Royal Halberdier has 207 HP on map 5 (was 115): ' + Math.round(h.max));
   const g2 = new G2(4, 'RANGER'); g2.stage = 23; g2.theme = 'palace'; const h2 = g2.spawnAt('HALBERDIER', g2.p.x + 300, g2.p.y) || g2.enemies[g2.enemies.length - 1];
   ok(h2.max > 115 * (1 + 0.09 * 22) * 1.5, 'stage 23 Halberdier is far tougher than before (' + Math.round(h2.max) + ' HP)');
-  const el = t.spawnAt('BLADEDANCER', t.p.x + 300, t.p.y) || t.enemies[t.enemies.length - 1]; ok(Math.round(el.max) === 105, 'elites are not multiplied by the map factor'); ok(MAP_HP.forest === 1 && MAP_HP.palace === 1.8, 'map HP factors 1 → 1.8'); }
+  const el = t.spawnAt('BLADEDANCER', t.p.x + 300, t.p.y) || t.enemies[t.enemies.length - 1]; ok(Math.round(el.max) === ENEMIES.BLADEDANCER.hp, 'elites are not multiplied by the map factor (base × ELITE.hp)'); ok(MAP_HP.forest === 1 && MAP_HP.palace === 1.8, 'map HP factors 1 → 1.8'); }
 process.exitCode = fail ? 1 : 0;

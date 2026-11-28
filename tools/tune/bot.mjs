@@ -4,6 +4,7 @@ import { Game, BOSS_STAGES } from '../../game.js';
 import * as FG from '../../forge.js';
 import { skillPower } from '../../kits.js';
 import { RELIC_BY_ID } from '../../relics.js';
+import { ENEMIES } from '../../sim.js';
 
 // strategy: 'merge' (mặc định: ghép tham lam) | 'spam' (giữ chiêu đơn, spam chiêu hiệu quả nhất, nhặt nâng cấp hồi máu/mana: kiểu người chơi thật đã phá đảo)
 const SPAM_PICKS = ['leech', 'regen', 'surge', 'flow', 'power', 'focus', 'fire', 'water', 'earth', 'wind', 'reserve', 'vital'];
@@ -108,12 +109,16 @@ export function run(cls, el, seed, skill = true, opts = {}) {
   const cfg = { level: opts.level || 'base', seed, shop: SHOP, value: opts.value, look: opts.look, push: opts.push, dashMiss: opts.dashMiss, strategy: opts.strategy || 'merge' };
   for (const id of opts.relics || []) { const r = RELIC_BY_ID[id]; if (!r || (r.cls && r.cls !== cls)) continue; (g.p.relics = g.p.relics || new Set()).add(id); r.apply(g.p.mods, g); g.refreshStats(false); }
   // sát thương nhận theo nguồn (chỉ đo trong công cụ, không đổi game)
-  const taken = { mob: 0, boss: 0 }, stageT = {}; let stT0 = 0, lastSt = g.stage;
-  const hp0 = g.hurtPlayer.bind(g); g.hurtPlayer = function (...a) { const q = this.p, h = q.hp; const r = hp0(...a); const d = Math.max(0, h - q.hp); if (d) taken[this.boss && !this.boss.dead ? 'boss' : 'mob'] += d; return r; };
+  const taken = { mob: 0, boss: 0, elite: 0 }, stageT = {}, eliteSeen = new Map(), eliteTTK = []; let stT0 = 0, lastSt = g.stage;
+  // sát thương nhận: 'elite' khi có elite còn sống trong 260px lúc trúng đòn (ước lượng, không có nguồn đòn chính xác)
+  const nearElite = q => g.enemies.some(e => !e.dead && ENEMIES[e.type] && ENEMIES[e.type].elite && Math.hypot(e.x - q.x, e.y - q.y) < 260);
+  const hp0 = g.hurtPlayer.bind(g); g.hurtPlayer = function (...a) { const q = this.p, h = q.hp; const r = hp0(...a); const d = Math.max(0, h - q.hp); if (d) { const k = this.boss && !this.boss.dead ? 'boss' : 'mob'; taken[k] += d; if (k === 'mob' && nearElite(q)) taken.elite += d; } return r; };
   const maxT = opts.maxT || 4500;
   while (!g.over && g.t < maxT && !(opts.maxStage && g.stage > opts.maxStage)) {
     if (opts.immortal && !(opts.mortalFrom && g.stage >= opts.mortalFrom)) g.p.hp = g.p.max;
     if (opts.onStep && opts.onStep(g) === false) break;
+    for (const e of g.enemies) if (ENEMIES[e.type] && ENEMIES[e.type].elite && !e.spawn && !eliteSeen.has(e)) eliteSeen.set(e, g.t);
+    for (const [e, t0] of eliteSeen) if (t0 >= 0 && (e.dead || !g.enemies.includes(e))) { if (e.dead) eliteTTK.push(+(g.t - t0).toFixed(1)); eliteSeen.set(e, -1); }
     if (g.state === 'reward') { if (bossStart) { bossTimes[g.stage] = Math.round(g.t - bossStart); bossStart = 0; } rewards(g, cfg.level, cfg.strategy); continue; }
     const st = g.stage;
     if (SHOP && g.forge && g.shopped !== st) { g.shopped = st; shop(g); }
@@ -122,5 +127,5 @@ export function run(cls, el, seed, skill = true, opts = {}) {
     if (g.stage !== st && bossStart) { bossTimes[st] = Math.round(g.t - bossStart); bossStart = 0; }
     if (g.stage !== lastSt) { stageT[lastSt] = Math.round(g.t - stT0); stT0 = g.t; lastSt = g.stage; }
   }
-  return { stage: g.stage, won: g.won, t: Math.round(g.t), casts: g.casts, owned: g.p.owned.size, merges: g.merges, bar: g.p.cores.slice(0, 4).map(c => c ? c.type : '-').join(''), bossTimes, bossHp: g.boss ? Math.round(100 * g.boss.hp / g.boss.max) : null, progress: +(g.stage + (g.boss && !g.won ? Math.max(0, 1 - g.boss.hp / g.boss.max) : 0)).toFixed(2), taken: { mob: Math.round(taken.mob), boss: Math.round(taken.boss) }, stageT, dmg: Math.round(g.stats.dmg) };
+  return { stage: g.stage, won: g.won, t: Math.round(g.t), casts: g.casts, owned: g.p.owned.size, merges: g.merges, bar: g.p.cores.slice(0, 4).map(c => c ? c.type : '-').join(''), bossTimes, bossHp: g.boss ? Math.round(100 * g.boss.hp / g.boss.max) : null, progress: +(g.stage + (g.boss && !g.won ? Math.max(0, 1 - g.boss.hp / g.boss.max) : 0)).toFixed(2), taken: { mob: Math.round(taken.mob), boss: Math.round(taken.boss), elite: Math.round(taken.elite) }, eliteTTK, stageT, dmg: Math.round(g.stats.dmg) };
 }

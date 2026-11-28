@@ -12,7 +12,7 @@ import { tickDefense, withPhantom, dmgTakenMul, critMul, clearShots, heal, tickH
 import { forgeDef, onCast, onHit, onTrap, onKill as onKillF, onDashEnd, onZone, onShot, onShotEnd } from './forgeups.js';
 import { relicBasic, relicHit, relicKill, relicCastAim, relicAfterCast, relicBlocksEnergy, healMul, tickRelics, relicShots, relicExplode, canBloodPay, bloodPay } from './relics.js';
 import { GOLD, BOSS_GOLD, goldRoll, enterForge, stageGold, rollForge, inForge, FORGE_R, FORGE_CALM, FORGE_NOSPAWN, smithOf, drinkPotion } from './forge.js';
-import { placeForge, removeForge } from './gameenv.js';
+import { placeForge, removeForge, eliteSteer } from './gameenv.js';
 import { isRanged, steerFoe } from './foes.js';
 import { initEnv, setTheme, rosterType, eliteFor, terraform, envHit, frontGuard, onDeath, foeLand, enemiesExtra, envStep, frozenInput } from './gameenv.js';
 
@@ -110,7 +110,7 @@ export class Game extends Sim {
     this.stats = { dmg: 0, bossKills: 0 };
     this.stage = 0; this.state = 'fight'; this.rewards = []; this.spawnQ = []; this.sigils = []; this.burstT = 0; this.stageT = 0; this.stageTotal = 0;
     this.arena = null; this.boss = null; this.loot = null; this.portal = null; this.travel = 0; this.deathSlow = 0; this.clearT = 0; this.waveN = 0; this.waveOf = 0; this.waveRest = 0; this.won = false; this.dmgScale = 1; this.packs = 0; this.packT = 3;
-    this.skillCache = new Map(); this.pickups = []; this.statDrops = 0; this.heal = n => heal(this, n);
+    this.skillCache = new Map(); this.pickups = []; this.statDrops = 0; this.heal = n => heal(this, n); this.eliteSteer = (e, d, dp, toP) => eliteSteer(this, e, d, dp, toP);
     const ob = this.world.onBreak; this.world.onBreak = o => { ob(o); this.rollDrop(o.supply ? 'supply' : o.type === 'crate' && o.v > 0.85 ? 'treasure' : o.type, o.x, o.y); };
     this.rerolls = 3; this.paidRerolls = 0; this.revived = false; p.skin = opts.skin || ''; p.skinFx = opts.skinFx || null;
     initEnv(this, opts); this.lab = !!opts.lab; if (this.lab) this.labTheme = opts.theme || 'forest'; setTheme(this, opts.theme || 'forest');

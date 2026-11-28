@@ -93,5 +93,17 @@
       1.25
     ],
     "weight": 3
+  },
+  "elite": {
+    "_why": "Elites (good bot, Normal): seconds from spawn to death, and share of non-boss damage taken while an elite is within 260px. PROPOSED, waiting for the user to confirm before /tune runs on it.",
+    "ttk": [
+      6,
+      12
+    ],
+    "share": [
+      0.15,
+      0.3
+    ],
+    "weight": 2
   }
 }

@@ -50,10 +50,10 @@ export function summarize(runs) {
     const [cls, diff, level] = k.split('|'), boss = {};
     for (const r of rs) for (const s in r.bossTimes) (boss[s] = boss[s] || []).push(r.bossTimes[s]);
     const deaths = {}; for (const r of rs) if (!r.won) deaths[r.stage] = (deaths[r.stage] || 0) + 1;
-    const tk = rs.reduce((a, r) => [a[0] + r.taken.mob, a[1] + r.taken.boss], [0, 0]);
+    const tk = rs.reduce((a, r) => [a[0] + r.taken.mob, a[1] + r.taken.boss, a[2] + (r.taken.elite || 0)], [0, 0, 0]), ettk = rs.flatMap(r => r.eliteTTK || []);
     out[k] = { cls, diff, level, n: rs.length, stage: +mean(rs.map(r => r.stage)).toFixed(2), progress: +mean(rs.map(r => r.progress)).toFixed(2), win: +(rs.filter(r => r.won).length / rs.length).toFixed(2),
       bossAtDeath: rs.filter(r => !r.won && BOSS_STAGES[r.stage] !== undefined).length / rs.length,
-      bossT: Object.fromEntries(Object.entries(boss).map(([s, v]) => [s, Math.round(mean(v))])), deaths, bossShare: +(tk[1] / Math.max(1, tk[0] + tk[1])).toFixed(2) };
+      bossT: Object.fromEntries(Object.entries(boss).map(([s, v]) => [s, Math.round(mean(v))])), deaths, bossShare: +(tk[1] / Math.max(1, tk[0] + tk[1])).toFixed(2), eliteShare: +(tk[2] / Math.max(1, tk[0])).toFixed(2), eliteTTK: ettk.length ? +mean(ettk).toFixed(1) : null, elites: ettk.length };
   }
   return out;
 }
