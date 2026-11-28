@@ -16,10 +16,10 @@ const off = (x, lo, hi) => x < lo ? (lo - x) / Math.max(1e-9, Math.abs(lo)) : x 
 export async function check({ area = 'all', only = null, seeds = 3 } = {}) {
   const T = JSON.parse(readFileSync(join(ROOT, 'tuning', 'targets.json'), 'utf8'));
   const items = [], add = (group, name, value, band, w, extra) => { const d = off(value, band[0], band[1]); items.push({ group, name, value: +(+value).toFixed(2), band, score: +(w * d).toFixed(3), ok: d === 0, ...extra }); };
-  const classes = only ? [only] : CLASSES;
+  const classes = only ? [only] : (T.heroes || CLASSES);   // targets.heroes: các tướng được cân bằng
 
   // 1. từng chiêu
-  const rows = bench(only); const unmeasured = [];
+  const rows = bench(classes); const unmeasured = [];
   for (const r of rows) { if (!r.offense) continue; if (!(r.value > 0)) { unmeasured.push(r.cls + ' ' + r.name); continue; } add('skill', r.cls + ' T' + r.tier + ' ' + r.name, r.ratio, T.skills.ratio, T.skills.weight, { cost: r.cost, raw: r.value, median: r.median }); }
 
   // 2. thời gian hạ boss với bot bất tử

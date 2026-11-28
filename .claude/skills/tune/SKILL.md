@@ -10,6 +10,7 @@ Goal: move the balance score (`tools/tune/check.mjs`, lower is better, 0 means e
 ## Rules (never break these)
 
 - **Never push.** Never `git push`, never merge into `main`. Commit only on the local branch `tune`.
+- **Leave Axiom alone.** Only the heroes in `targets.heroes` (Knight, Ranger, Mage) are tuned; never change Axiom numbers (`KITS.AXIOM`, `ax*` ultimates, `axiom.js`).
 - **Never edit the yardstick.** Do not change `tuning/targets.json`, `tools/tune/*` or the tests to make a number pass. If a target looks wrong, stop and ask the user.
 - **Numbers only.** Change balance values: skill `dmg` / `cost` / `radius` / counts in `kits.js`, ultimate numbers in `ults.js`, `BRUTAL` / `COOP` / enemy and boss stats in `game.js`, `boss.js`, `sim.js` (`CLASSES`, `ENEMIES`), economy in `profile.js` / `forge.js`. If a fix needs new mechanics or behaviour, stop and report it as a design question.
 - **One knob group per round, at most ±15% per value.** A knob group is one skill, one boss, one hero's base stats, or one `BRUTAL` entry.

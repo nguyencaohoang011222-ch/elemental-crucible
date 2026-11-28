@@ -1,5 +1,11 @@
 {
   "_note": "Target bands for the balance loop (tools/tune/check.mjs). Only change them after the user agrees. A metric scores 0 inside its band; outside, it scores weight x relative distance to the nearest edge.",
+  "heroes": [
+    "KNIGHT",
+    "RANGER",
+    "MAGE"
+  ],
+  "_heroes": "Heroes the loop balances. AXIOM is left out on purpose (user, 2026-11-28): do not tune it.",
   "skills": {
     "_why": "Each attack skill's value (damage per energy, single + cluster/3) compared to the median of the other attack skills of the same tier across all heroes. Utility skills (control, mobility, defense) are not scored.",
     "ratio": [

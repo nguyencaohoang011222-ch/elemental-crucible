@@ -33,7 +33,7 @@ function dealt(cls, core, spots) {
 export function bench(only) {
   const rows = [];
   for (const cls of CLASSES) {
-    if (only && only !== cls) continue;
+    if (only && !(Array.isArray(only) ? only.includes(cls) : only === cls)) continue;   // only: một tướng hoặc danh sách tướng
     for (const c of cores()) {
       const a = dealt(cls, c, SINGLE), b = dealt(cls, c, CLUSTER), sk = a.sk, cost = Math.max(1, sk.cost || 1);
       rows.push({ cls, name: sk.name, key: sk.key, tier: tierOf(c), group: sk.group, offense: OFFENSE.has(sk.group), cost,
