@@ -546,7 +546,7 @@ export function updateHazards(g, dt) {
   for (const h of g.hazards) {
     if (h.kind === 'beam' || h.kind === 'vortex') { special(g, h, dt); continue; }
     if (h.kind === 'shadowblast') {
-      if (!h.done) { h.t -= dt; if (h.t <= 0) { h.done = true; h.fade = 0.6; const safe = (h.pockets || []).some(q => dist(q.x, q.y, p.x, p.y) < q.r + p.r * 0.3); if (!safe && !g.labGod) { const iv = p.inv; p.inv = 0; g.hurtPlayer(h.dmg * (h.owner ? h.owner.def.dmg : 1), Math.atan2(p.y - h.y, p.x - h.x), { boss: true }); p.inv = Math.max(p.inv, iv); p.burnT = Math.max(p.burnT || 0, 3); } g.emit('lastFlame', { x: h.x, y: h.y, r: h.r, safe }); } }
+      if (!h.done) { h.t -= dt; if (h.t <= 0) { h.done = true; h.fade = 0.6; g.forTargets(p => { const safe = (h.pockets || []).some(q => dist(q.x, q.y, p.x, p.y) < q.r + p.r * 0.3); if (!safe && !g.labGod) { const iv = p.inv; p.inv = 0; g.hurtPlayer(h.dmg * (h.owner ? h.owner.def.dmg : 1), Math.atan2(p.y - h.y, p.x - h.x), { boss: true }); p.inv = Math.max(p.inv, iv); p.burnT = Math.max(p.burnT || 0, 3); } g.emit('lastFlame', { x: h.x, y: h.y, r: h.r, safe }); }); } }
       else h.fade -= dt;
       continue;
     }
@@ -562,10 +562,10 @@ export function updateHazards(g, dt) {
       h.t -= dt;
       if (h.t <= 0) {
         h.done = true; h.fade = 0.3;
-        if (h.kind === 'ring') { h.active = true; h.hitP = false; }
+        if (h.kind === 'ring') { h.active = true; h.hitP0 = h.hitP1 = false; }
         else if (!h.visual) {
           smash(g, h);
-          if (hitsPlayer(h, p)) { g.hurtPlayer(h.dmg * (b && b.def ? b.def.dmg : 1), Math.atan2(p.y - h.y, p.x - h.x), { boss: true }); if (h.stunP) p.frozen = Math.max(p.frozen || 0, h.stunP); if (h.rootP) { p.rooted = Math.max(p.rooted || 0, h.rootP); g.emit('rooted', { x: p.x, y: p.y }); } if (h.push) { const pa = Math.atan2(p.y - h.y, p.x - h.x); p.vx += Math.cos(pa) * h.push; p.vy += Math.sin(pa) * h.push; } }
+          g.forTargets(p => { if (hitsPlayer(h, p)) { g.hurtPlayer(h.dmg * (b && b.def ? b.def.dmg : 1), Math.atan2(p.y - h.y, p.x - h.x), { boss: true }); if (h.stunP) p.frozen = Math.max(p.frozen || 0, h.stunP); if (h.rootP) { p.rooted = Math.max(p.rooted || 0, h.rootP); g.emit('rooted', { x: p.x, y: p.y }); } if (h.push) { const pa = Math.atan2(p.y - h.y, p.x - h.x); p.vx += Math.cos(pa) * h.push; p.vy += Math.sin(pa) * h.push; } } });
           g.emit('bossHit', { x: h.x, y: h.y, kind: h.kind, r: h.r || 60, color: h.color, boss: b && b.type });
           if (h.shock) g.hazards.push({ kind: 'ring', x: h.x, y: h.y, rr: h.r * 0.4, speed: 300, max: Math.min(320, h.shock.max), thick: h.shock.thick, dmg: h.shock.dmg, owner: b, color: h.color, t: 0.35, T: 0.35, hold: 0, pre: true, shockPre: true });
           if (h.after) h.after();
@@ -573,11 +573,12 @@ export function updateHazards(g, dt) {
       }
     } else if (h.active) {
       h.rr += h.speed * dt;
-      if (!h.hitP && Math.abs(dist(h.x, h.y, p.x, p.y) - h.rr) < h.thick / 2 + p.r && p.inv <= 0 && !p.leap) {
-        h.hitP = true; const a = Math.atan2(p.y - h.y, p.x - h.x);
+      g.forTargets(p => { const hk = 'hitP' + (p.pi || 0);
+      if (!h[hk] && Math.abs(dist(h.x, h.y, p.x, p.y) - h.rr) < h.thick / 2 + p.r && p.inv <= 0 && !p.leap) {
+        h[hk] = true; const a = Math.atan2(p.y - h.y, p.x - h.x);
         g.hurtPlayer(h.dmg * (h.owner && h.owner.def ? h.owner.def.dmg : 1), a, { boss: true });
         if (h.push) { p.vx += Math.cos(a) * h.push; p.vy += Math.sin(a) * h.push; }
-      }
+      } });
       if (h.rr >= h.max) h.active = false;
     } else h.fade -= dt;
   }
@@ -589,10 +590,11 @@ function special(g, h, dt) {
   if (h.kind === 'beam') {
     if (b && !b.dead) { h.x = b.x; h.y = b.y; } else { h.dead = true; return; }
     if (h.t > 0) { h.t -= dt; return; }
-    h.active = true; h.dur -= dt; h.a += h.spin * dt; h.hitCd -= dt;
+    h.active = true; h.dur -= dt; h.a += h.spin * dt; h.hitCd -= dt; for (const k of ['hitCd0', 'hitCd1']) if (h[k] !== undefined) h[k] -= dt;
     for (let k = 0; k < h.n; k++) {
       const a = beamAngle(h, k), ca = Math.cos(a), sa = Math.sin(a), rx = p.x - h.x, ry = p.y - h.y, along = rx * ca + ry * sa, side = -rx * sa + ry * ca;
-      if (h.hitCd <= 0 && along > b.r * 0.5 && along < h.len && Math.abs(side) < h.width / 2 + p.r * 0.5 && p.inv <= 0 && !p.leap) { h.hitCd = 0.55; g.hurtPlayer(h.dmg * (b.def ? b.def.dmg : 1), a + Math.PI / 2, { boss: true }); if (h.onHitP) h.onHitP(); }
+      g.forTargets(p => { const rx = p.x - h.x, ry = p.y - h.y, along = rx * ca + ry * sa, side = -rx * sa + ry * ca, ck = 'hitCd' + (p.pi || 0); if (h[ck] === undefined) h[ck] = h.hitCd;
+        if (h[ck] <= 0 && along > b.r * 0.5 && along < h.len && Math.abs(side) < h.width / 2 + p.r * 0.5 && p.inv <= 0 && !p.leap) { h[ck] = 0.55; g.hurtPlayer(h.dmg * (b.def ? b.def.dmg : 1), a + Math.PI / 2, { boss: true }); if (h.onHitP) h.onHitP(); } });
       if (h.trail && g.surface && g.rand() < dt * 6) { const d = b.r + g.rand() * (h.len - b.r); g.surface.apply(h.x + ca * d, h.y + sa * d, 28, h.trail, { rand: g.rand, life: 4 }); }
     }
     if (h.dur <= 0) h.dead = true;
@@ -600,9 +602,8 @@ function special(g, h, dt) {
     if (h.t > 0) { h.t -= dt; return; }
     h.active = true; h.dur -= dt; h.hitCd -= dt;
     const pull = (e, m) => { const d = dist(e.x, e.y, h.x, h.y); if (d < h.r && d > 4) { const k = h.force * m * (1 - d / h.r * 0.4) * dt; e.x += (h.x - e.x) / d * k; e.y += (h.y - e.y) / d * k; } return d; };
-    const d = pull(p, p.dashT > 0 ? 0.4 : 1);
     for (const e of g.enemies) if (!e.boss && !e.dead) pull(e, 0.8);
-    if (d < 46 && h.hitCd <= 0) { h.hitCd = 0.5; g.hurtPlayer(h.dmg * (b ? b.def.dmg : 1), 0, { boss: true }); }
+    let hitAny = false; g.forTargets(p => { const d = pull(p, p.dashT > 0 ? 0.4 : 1); if (d < 46 && h.hitCd <= 0) { hitAny = true; g.hurtPlayer(h.dmg * (b ? b.def.dmg : 1), 0, { boss: true }); } }); if (hitAny) h.hitCd = 0.5;
     if (h.dur <= 0) h.dead = true;
   }
 }

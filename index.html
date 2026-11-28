@@ -166,6 +166,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tbtn svg{flex:none;color:#9aa09d;transition:color .15s,transform .2s}
 .tbtn:hover,.tbtn:focus{outline:none;transform:translateY(-2px);border-color:#d4af3799;color:#fff;background:#1a2a24dd;box-shadow:0 6px 18px #0009}.tbtn:hover svg,.tbtn:focus svg{color:#d4af37;transform:scale(1.12)}
 .tbtn.hero{height:56px;font-size:17px;letter-spacing:.14em;color:#f2d675;border-color:#d4af37;background:linear-gradient(#2e2712,#201b0c);box-shadow:0 0 18px #d4af3730,inset 0 0 16px #d4af3718}
+.coopbox{width:min(560px,94vw);text-align:center}.cpstep{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cpbig{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}.cpb{display:flex;flex-direction:column;align-items:center;gap:6px;width:200px;padding:20px 12px;background:#13201bcc;border:2px solid #d4af3766;color:#e8ece9;font:700 18px 'Pixelify Sans',monospace;clip-path:var(--px-step2);cursor:pointer}.cpb:hover:not(:disabled){border-color:var(--gold);color:#fff}.cpb span{font:600 12px 'Pixelify Sans',monospace;color:#9aa09d}.cpb:disabled{opacity:.4;cursor:default}
+.cpcode{font:700 56px 'Pixelify Sans',monospace;letter-spacing:.3em;color:var(--gold);padding:6px 4px 6px .3em;text-shadow:0 3px 0 #000}.cpin{width:280px;text-align:center;background:#0c120f;border:2px solid #d4af3766;color:var(--gold);text-transform:uppercase;outline:none}.cpin:focus{border-color:var(--gold)}.cpin::placeholder{color:#4a4a3a}
+.cpstatus{font:600 14px 'Pixelify Sans',monospace;color:#c9d2cc;min-height:18px;margin:0}.cpstatus.err{color:#ff8a6a}
+.cplob{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;width:100%}.cpslot{flex:1;min-width:220px;background:#0e1714cc;border:1px solid #ffffff1c;padding:10px;clip-path:var(--px-step2)}.cpslot h4{margin:0 0 8px;color:var(--gold);font:700 15px 'Pixelify Sans',monospace}
+.cprow{display:flex;gap:6px;justify-content:center;margin:6px 0}.cphero{flex:1;padding:8px 4px;background:#13201b;border:1px solid #ffffff22;color:#e8ece9;font:700 13px 'Pixelify Sans',monospace;cursor:pointer}.cphero.on,.cpel.on{border-color:var(--gold);background:#2a2412;color:#fff}.cphero:disabled,.cpel:disabled{cursor:default}
+.cpel{width:44px;height:44px;padding:4px;background:#13201b;border:1px solid #ffffff22;cursor:pointer}.cpel img{width:32px;height:32px;image-rendering:pixelated}
+#pause.coop .pbtn[data-act="restart"],#end.coop [data-act="restart"],#victory.coop [data-act="restart"]{display:none}
+@media (max-height:500px){.cpcode{font-size:38px}.cpb{padding:10px;width:170px}.cpslot{padding:6px}.cpel{width:36px;height:36px}.cpel img{width:26px;height:26px}.coopbox h2{margin:0}}
 .tbtn small{display:block;margin-top:2px;font:600 10px 'Pixelify Sans',monospace;letter-spacing:.06em;color:#c9b67a;text-transform:none}.tbtn span:has(small){line-height:1.05}
 .tbtn.hero svg{color:#d4af37}.tbtn.hero:hover{box-shadow:0 0 28px #d4af3766,inset 0 0 20px #d4af3730;color:#fff1b0}
 .ndot{display:none;position:absolute;right:16px;top:50%;width:9px;height:9px;margin-top:-4.500px;border-radius:50%;background:#38bdf8;box-shadow:0 0 0 0 #38bdf8aa;animation:ndot 1.8s infinite}.ndot.on{display:block}
@@ -646,6 +655,7 @@ body.touch #hint{bottom:auto;top:64px}
   <div class="tmenu">
     <button class="tbtn hero hidden" data-act="continue" id="contbtn"><i data-px="play" data-size="22"></i><span>Continue<small></small></span></button>
     <button class="tbtn hero" data-act="newrun"><i data-px="play" data-size="22"></i><span>New Run</span></button>
+    <button class="tbtn" data-act="coop" id="coopbtn"><i data-px="duo" data-size="20"></i><span>Co-op</span></button>
     <button class="tbtn" data-act="lab"><i data-px="wrench" data-size="20"></i><span>Test Lab</span></button>
     <button class="tbtn" data-act="shop"><i data-px="gem" data-size="20"></i><span>Shop &amp; Skins</span></button>
     <button class="tbtn" data-act="daily"><i data-px="star" data-size="20"></i><span>Daily Quests</span><i class="ndot" id="questdot"></i></button>
@@ -699,6 +709,17 @@ body.touch #hint{bottom:auto;top:64px}
   <div class="setrow"><label for="s-fps">Show FPS (F3)</label><input type="checkbox" id="s-fps"></div>
   <div class="setrow"><label for="s-autopause">Pause when the window loses focus</label><input type="checkbox" id="s-autopause"></div>
   <div class="row"><button class="btn go" data-close>Done</button></div>
+</div></div>
+
+<div id="coop" class="screen modal"><div class="box coopbox">
+  <h2>Play Together</h2>
+  <div id="cp-pick" class="cpstep"><p class="sub">Two players, two devices, same Wi-Fi works best.</p>
+    <div class="cpbig"><button class="cpb" id="cp-host"><i data-px="play" data-size="30"></i><b>Host</b><span>Get a code to share</span></button><button class="cpb" id="cp-join"><i data-px="duo" data-size="30"></i><b>Join</b><span>Type a friend's code</span></button></div>
+    <p class="cpstatus err" id="cp-err"></p></div>
+  <div id="cp-wait" class="cpstep hidden"><p class="sub">Tell your friend this code</p><div class="cpcode" id="cp-code">----</div><p class="cpstatus" id="cp-hs">Waiting for your friend…</p></div>
+  <div id="cp-enter" class="cpstep hidden"><p class="sub">Type the code on your friend's screen</p><input id="cp-in" class="cpcode cpin" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="----"><p class="cpstatus" id="cp-js"></p><button class="btn go" id="cp-go" disabled>Join</button></div>
+  <div id="cp-lobby" class="cpstep hidden"><div class="cplob"><div class="cpslot" id="cp-me"></div><div class="cpslot" id="cp-them"></div></div><p class="cpstatus" id="cp-ls"></p><button class="btn go" id="cp-start">Start</button></div>
+  <div class="row"><button class="btn" id="cp-back">Close</button></div>
 </div></div>
 
 <div id="controls" class="screen modal"><div class="box" style="width:min(760px,94vw)">

@@ -55,6 +55,10 @@ export async function pushSave(data) {
   return true;
 }
 
+// kênh phát sóng dùng để bắt tay co-op (không cần đăng nhập)
+export function realtime(name) { return sb ? sb.channel(name, { config: { broadcast: { self: false } } }) : null; }
+export const onlineReady = () => !!sb;
+
 // gửi một lượt chơi đã kết thúc (cần đăng nhập + có nickname)
 export async function submitRun(r) {
   if (!sb || !user || !nick) return false;

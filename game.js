@@ -66,10 +66,17 @@ function segDist(x, y, w) {
   return { d, nx: (x - px) / d, ny: (y - py) / d };
 }
 
+// co-op: các trường "của người chơi" nằm trên chính p; g.<tên> luôn trỏ vào người đang hành động (g.p)
+export const PER_PLAYER = ['inQ', 'dashQ', 'spaceQ', 'aim', 'rewards', 'shopBuys', 'visitBuys', 'visitRelics', 'relicRerolls', 'relicOffer', 'inForge', 'forgeVisits', 'forgeDry', 'upgrades', 'upgradeLog', 'casts', 'merges', 'discovered', 'statDrops', 'rerolls', 'paidRerolls', 'revived', 'skillCache', 'zoneDr', 'pv', 'hidePt', 'goldEarned', 'noHitBoss'];
+// vật thể do người chơi tạo ra: mỗi món nhớ chủ để khi cập nhật thì g.p = chủ của nó
+const OWNED = ['shots', 'zones', 'pending', 'traps', 'walls', 'ults', 'relicFx'];
+export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
 export const MAP_HP = { forest: 1, dungeon: 1.2, frost: 1.4, volcano: 1.6, palace: 1.8 };   // máu gốc quái thường theo map
 export class Game extends Sim {
   constructor(seed = 1, cls = 'KNIGHT', opts = {}) {
     super(seed, cls);
+    for (const k of PER_PLAYER) Object.defineProperty(this, k, { get() { return this.p['_' + k]; }, set(v) { this.p['_' + k] = v; }, configurable: true });
+    this.coopN = opts.coopN || 1; this.players = [this.p];
     const p = this.p;
     this.training = !!opts.training; this.difficulty = opts.difficulty || 'NORMAL'; this.diff = this.difficulty === 'HARD' ? { hp: 1.3, dmg: 1.3 } : { hp: 1, dmg: 1 };
     p.cores = Array(INV_SIZE).fill(null);
@@ -212,10 +219,10 @@ export class Game extends Sim {
       it.t += dt; it.life -= dt; it.x += it.vx * dt; it.y += it.vy * dt; const fr = it.vz !== undefined ? 0.975 : 0.9; it.vx *= fr; it.vy *= fr;
       if (it.vz !== undefined) { it.z += it.vz * dt; it.vz -= 1100 * dt; if (it.z <= 0) { it.z = 0; it.vz = Math.abs(it.vz) > 90 ? -it.vz * 0.45 : 0; if (!it.vz) { it.vx *= 0.3; it.vy *= 0.3; } } }   // vòng nảy rơi xuống sàn
       if (it.z > 1) continue;
-      const d = dist(it.x, it.y, p.x, p.y) || 0.01;
+      const p = this.coop ? this.nearestPlayer(it.x, it.y) : this.p, d = dist(it.x, it.y, p.x, p.y) || 0.01;
       if ((this.clearT > 0 || this.vacuum) && it.t > 0.2) { const k = Math.min(d, (380 + it.t * 300) * dt); it.x += (p.x - it.x) / d * k; it.y += (p.y - it.y) / d * k; }   // dọn stage: mọi vàng/hồi máu bay về người chơi
       else if (it.t > 0.35 && d < 120) { const k = 520 * (1 - d / 140) * dt; it.x += (p.x - it.x) / d * k; it.y += (p.y - it.y) / d * k; }
-      if (it.t > 0.35 && dist(it.x, it.y, p.x, p.y) < 22) { this.collect(it); it.life = 0; }
+      if (it.t > 0.35 && dist(it.x, it.y, p.x, p.y) < 22) { this.as(p, () => this.collect(it)); it.life = 0; }
     }
     this.pickups = this.pickups.filter(it => it.life > 0);
   }
@@ -655,11 +662,15 @@ export class Game extends Sim {
       if (this.world.blocked(f.x, f.y, f.r)) { f.life = 0; continue; }
       for (const w of this.walls) if (segDist(f.x, f.y, w).d < 14) { f.life = 0; this.emit('block', { x: f.x, y: f.y }); }
       if (this.forge && dist(f.x, f.y, this.forge.x, this.forge.y) < FORGE_R + f.r) { f.life = 0; f.landed = true; this.emit('block', { x: f.x, y: f.y }); continue; }
-      for (const z of this.zones) if (z.kind === 'barrier' && dist(f.x, f.y, z.follow ? p.x : z.x, z.follow ? p.y : z.y) < z.r + f.r) { f.life = 0; this.emit('block', { x: f.x, y: f.y }); }
+      for (const z of this.zones) if (z.kind === 'barrier' && dist(f.x, f.y, z.follow ? this.ownerOf(z).x : z.x, z.follow ? this.ownerOf(z).y : z.y) < z.r + f.r) { f.life = 0; this.emit('block', { x: f.x, y: f.y }); }
       if (f.life <= 0) continue;
       if (f.trail && this.surface && this.rand() < 0.5) this.surface.apply(f.x, f.y, 22, f.trail, { rand: this.rand, life: 6 });
-      if (this.parryShot(f)) continue;   // nhát chém đỡ trước khi đạn chạm người
-      if (p.inv <= 0 && !p.leap && !(f.pierce && f.hitP) && dist(f.x, f.y, p.x, p.y) < f.r + p.r) { f.hitP = true; this.hurtPlayer(f.dmg, Math.atan2(f.vy, f.vx), { boss: f.boss }); if (!f.pierce) { f.life = 0; continue; } }
+      let gone = false;
+      for (const q of this.targets()) { if (gone) break; this.as(q, () => {
+        if (this.parryShot(f)) { gone = true; return; }   // nhát chém đỡ trước khi đạn chạm người
+        if (q.inv <= 0 && !q.leap && !(f.pierce && f.hitP) && dist(f.x, f.y, q.x, q.y) < f.r + q.r) { f.hitP = true; this.hurtPlayer(f.dmg, Math.atan2(f.vy, f.vx), { boss: f.boss }); if (!f.pierce) { f.life = 0; gone = true; } }
+      }); }
+      if (gone) continue;
     }
     for (const f of this.foes) if (f.life <= 0 && !f.landed) { f.landed = true; foeLand(this, f); }
     this.foes = this.foes.filter(f => f.life > 0);
@@ -669,7 +680,8 @@ export class Game extends Sim {
   spawnAt(type, x, y) {
     // máu: +13% mỗi stage; quái thường của map sau có máu gốc cao hơn (áp dụng cả trong phòng tập)
     const d = ENEMIES[type], inBoss = !!(this.boss && !this.boss.dead), mapMul = d.elite || d.illusion || d.mini || inBoss || type === 'DUMMY' ? 1 : (MAP_HP[this.theme] || 1), s = type === 'DUMMY' ? 1 : (this.training ? 1 : (1 + (inBoss ? 0.09 : 0.13) * Math.max(0, this.stage - 1)) * this.diff.hp) * mapMul;   // lính boss gọi ra giữ thang máu cũ
-    const e = { id: this.nextId++, type, x, y, r: d.r, hp: d.hp * s, max: d.hp * s, kx: 0, ky: 0, flash: 0, state: 'move', st: 0.8 + this.rand() * 1.1, atkCd: 0.4 + this.rand() * 0.7, dead: false, ta: 0, spawn: 0.4, flank: (this.rand() < 0.5 ? -1 : 1) * (0.5 + this.rand() * 0.8),
+    const cm = type === 'DUMMY' ? 1 : 1 + COOP.hp * (this.coopN - 1);
+    const e = { id: this.nextId++, type, x, y, r: d.r, hp: d.hp * s * cm, max: d.hp * s * cm, kx: 0, ky: 0, flash: 0, state: 'move', st: 0.8 + this.rand() * 1.1, atkCd: 0.4 + this.rand() * 0.7, dead: false, ta: 0, spawn: 0.4, flank: (this.rand() < 0.5 ? -1 : 1) * (0.5 + this.rand() * 0.8),
       burn: 0, burnTick: 0, wet: 0, slow: 0, slowAmt: 0, root: 0, freeze: 0, stun: 0, blind: 0, rootImm: 0, idle: 0 };
     this.enemies.push(e); if (d.elite) this.emit('eliteSpawn', { x, y, name: d.name }); return e;
   }
@@ -686,7 +698,7 @@ export class Game extends Sim {
     const confused = [];   // bị Nhiễu Thực Tại: không chạy AI thường
     for (const e of this.enemies) (e.type === 'DUMMY' ? dummies : e.boss ? bosses : e.confuse > 0 ? confused : minions).push(e);
     for (const e of dummies) { e.flash = Math.max(0, e.flash - dt); e.spawn = Math.max(0, e.spawn - dt); e.x += e.kx * dt; e.y += e.ky * dt; e.kx *= Math.exp(-14 * dt); e.ky *= Math.exp(-14 * dt); e.idle += dt; if (e.hp < e.max && e.idle > 3) e.hp = e.max; }
-    const n0 = this.enemies.length; withPhantom(this, this.hidePt, () => { for (const b of bosses) bossUpdate(this, b, dt); });
+    const n0 = this.enemies.length; for (const b of bosses) this.asTarget(b, () => withPhantom(this, this.hidePt, () => bossUpdate(this, b, dt)));
     minions.push(...this.enemies.slice(n0)); // quái do boss gọi ra trong lượt này (lính nấm, phân thân) — trước đây bị mất
     const frozen = new Map();
     for (const e of minions) {
@@ -696,7 +708,7 @@ export class Game extends Sim {
     }
     this.enemies = minions;
     const foesBefore = this.foes.length;
-    withPhantom(this, this.hidePt, () => super.updateEnemies(dt));
+    this.byTarget(dt, () => withPhantom(this, this.hidePt, () => super.updateEnemies(dt)));
     for (const [e, s] of frozen) {
       if (e.dead) continue;
       const kx = e.kx * dt, ky = e.ky * dt;
@@ -706,7 +718,7 @@ export class Game extends Sim {
       if (s.blind && e.state === 'tele') { e.state = 'move'; e.st = 0.5; }
     }
     for (let i = foesBefore; i < this.foes.length; i++) { const f = this.foes[i]; for (const [e, s] of frozen) if ((s.hard || s.blind) && dist(f.x, f.y, e.x, e.y) < 30) f.life = 0; }
-    withPhantom(this, this.hidePt, () => enemiesExtra(this, dt));
+    this.byTarget(dt, () => withPhantom(this, this.hidePt, () => enemiesExtra(this, dt)));
     if (this.forge) { const F = this.forge; for (const e of this.enemies) { if (e.dead || e.type === 'DUMMY') continue; const d = dist(e.x, e.y, F.x, F.y), m = FORGE_R + e.r + 6; if (d < m && d > 0.1) { e.x = F.x + (e.x - F.x) / d * m; e.y = F.y + (e.y - F.y) / d * m; if (e.state === 'charge') { e.state = 'stagger'; e.st = 0.5; } } } }
     for (const e of this.enemies) if (e.fMark > 0) e.fMark -= dt;
     this.enemies.push(...confused.filter(c => !c.dead), ...dummies.filter(d => !d.dead), ...bosses.filter(b => !b.dead));
@@ -720,7 +732,8 @@ export class Game extends Sim {
   // ---------- stage ----------
   startStage(n) {
     const p = this.p;
-    this.stage = n; this.state = 'fight'; this.stageT = 0; this.forgeHold = false; this.spawnQ = []; this.sigils = []; this.burstT = 0.8;
+    this.stage = n; this.state = 'fight'; this.stageT = 0; this.forgeHold = false;
+    if (this.coop) this.players.forEach((q, i) => { if (i && q !== p) { q.x = p.x + 56 * i; q.y = p.y + 20; q.vx = q.vy = 0; this.world.collide(q, q.r); } }); this.spawnQ = []; this.sigils = []; this.burstT = 0.8;
     this.clearT = 0; this.waveN = 0; this.waveOf = 0; this.waveRest = 0; this.loot = null; this.portal = null; this.travel = 0; this.deathSlow = 0; this.vacuum = false;
     setTheme(this, this.labTheme || themeForStage(n));
     this.inQ = []; p.queued = null;
@@ -734,11 +747,11 @@ export class Game extends Sim {
       buildArena(this, BOSS_DEFS[bi].id, gate); this.portal = gate; p.energy = p.energyMax; // vào trận boss: nạp đầy năng lượng một lần
       let bx = p.x + 380, by = p.y;
       for (let k = 0; k < 24; k++) { const a = this.rand() * TAU; bx = p.x + Math.cos(a) * 380; by = p.y + Math.sin(a) * 380; if (!this.world.blocked(bx, by, BOSS_DEFS[bi].r)) break; }
-      this.bossDropNext = 0.875; this.boss = makeBoss(this, bi, bx, by); this.boss.hp = this.boss.max = this.boss.max * this.diff.hp; this.enemies.push(this.boss);
+      this.bossDropNext = 0.875; this.boss = makeBoss(this, bi, bx, by); this.boss.hp = this.boss.max = this.boss.max * this.diff.hp * (1 + COOP.boss * (this.coopN - 1)); this.enemies.push(this.boss);
       this.emit('bossIntro', { name: BOSS_DEFS[bi].name, epithet: BOSS_DEFS[bi].epithet, idx: bi });
     } else {
       if (this.arena) teardownArena(this, true); this.boss = null;
-      const total = Math.round(5 + n * 1.2), list = [];   // ít quái hơn nhưng trâu hơn
+      const total = Math.round((5 + n * 1.2) * (1 + COOP.count * (this.coopN - 1))), list = [];   // ít quái hơn nhưng trâu hơn
       for (let i = 0; i < total; i++) {
         const r = this.rand(), wc = n >= 2 ? 0.25 + n * 0.015 : 0, ws = n >= 3 ? 0.22 + n * 0.012 : 0;
         const ty = rosterType(this, r < ws ? 'SHOOTER' : r < ws + wc ? 'CHARGER' : 'GRUNT'); list.push(ty);
@@ -793,7 +806,7 @@ export class Game extends Sim {
     G.t += dt;
     if (G.state === 'sealed' && L.t > 1.6) { G.state = 'opening'; G.t = 0; this.emit('gateOpen', { x: G.x, y: G.y, theme: G.theme }); }
     else if (G.state === 'opening' && G.t > 1.8) G.state = 'open';
-    if (G.state !== 'sealed' && G.t > 0.9 && dist(p.x, p.y, G.x, G.y) < 54) { this.travel = GATE_TRAVEL; this.emit('gateEnter', { theme: G.theme }); }
+    if (G.state !== 'sealed' && G.t > 0.9 && this.targets().some(q => dist(q.x, q.y, G.x, G.y) < 54)) { this.travel = GATE_TRAVEL; this.emit('gateEnter', { theme: G.theme }); }
   }
   // một đợt quái từ 3–4 hướng: cận chiến tuyến trước, tầm xa đứng sau; mỗi con có ấn báo 0.8s trước khi hiện
   spawnWave(types, now = false) {
@@ -839,17 +852,108 @@ export class Game extends Sim {
   }
   clearStage() {
     const p = this.p, wasBoss = BOSS_STAGES[this.stage] !== undefined;
-    p.hp = Math.min(p.max, p.hp + p.max * (wasBoss ? 1 : 0.3));
-    for (const it of this.pickups) this.collect(it); this.pickups = []; // dọn stage: tự nhặt hết đồ còn rơi
+    for (const q of this.players) { if (q.down) { q.down = false; q.hp = 0; } q.hp = Math.min(q.max, Math.max(q.hp, q.max * 0.5 * (this.coop ? 1 : 0)) + q.max * (wasBoss ? 1 : 0.3)); }
+    for (const it of this.pickups) this.as(this.nearestPlayer(it.x, it.y), () => this.collect(it)); this.pickups = []; // dọn stage: tự nhặt hết đồ còn rơi
     this.foes = []; this.pending = []; this.hazards = []; this.zones = []; this.traps = []; this.sigils = [];
     for (const o of this.world.temp) if (o.foeIce) o.dead = true; this.world.temp = this.world.temp.filter(o => !o.dead);
     removeForge(this);
-    if (!this.training) this.addGold(stageGold(this.stage), 'stage');
+    if (!this.training) for (const q of this.players) this.as(q, () => this.addGold(stageGold(this.stage), 'stage'));
     this.emit('stageClear', { n: this.stage, boss: wasBoss });
     if (this.stage >= LAST_STAGE) { this.won = true; this.over = true; this.emit('victory', {}); return; }
     this.state = 'reward';
-    this.rewards = [{ type: 'minor', choices: rollMinor(this) }];
-    if (MAJOR_STAGES.includes(this.stage + 1)) this.rewards.push({ type: 'major', choices: rollMajor(this) });
+    for (const q of this.players) this.as(q, () => { this.rewards = [{ type: 'minor', choices: rollMinor(this) }]; if (MAJOR_STAGES.includes(this.stage + 1)) this.rewards.push({ type: 'major', choices: rollMajor(this) }); });
+  }
+  // ================= co-op =================
+  // chạy fn với g.p = q (người đang hành động); một người chơi thì gọi thẳng
+  as(q, fn) { if (q === this.p || !q) return fn(); const o = this.p; this.p = q; try { return fn(); } finally { this.p = o; } }
+  targets() { return this.coop ? this.players.filter(q => !q.down) : [this.p]; }
+  forTargets(fn) { for (const q of this.targets()) this.as(q, () => fn(q)); }
+  nearestPlayer(x, y) { let b = this.players[0], bd = 1e18; for (const q of this.targets()) { const d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < bd) { bd = d; b = q; } } return b; }
+  ownerOf(x) { return (x && x.owner) || this.players[0]; }
+  tagOwned() { if (!this.coop) return; for (const n of OWNED) for (const x of this[n] || []) if (x && !x.owner) x.owner = this.p; }
+  // tách các mảng vật thể theo chủ, chạy fn cho phần của q, rồi ghép lại
+  ownRun(q, names, fn) {
+    const keep = {}; for (const n of names) { const all = this[n] || []; keep[n] = all.filter(x => this.ownerOf(x) !== q); this[n] = all.filter(x => this.ownerOf(x) === q); }
+    try { this.as(q, () => { fn(); this.tagOwned(); }); } finally { for (const n of names) this[n] = keep[n].concat(this[n] || []); }
+  }
+  // mục tiêu của một con địch: người gần nhất, giữ mục tiêu cũ trừ khi người kia gần hơn 150px
+  pickTarget(e) {
+    const alive = this.targets(); if (!alive.length) return this.players[0];
+    let t = e.tgt && !e.tgt.down ? e.tgt : null, best = null, bd = 1e18;
+    for (const q of alive) { const d = Math.hypot(q.x - e.x, q.y - e.y); if (d < bd) { bd = d; best = q; } }
+    if (!t || Math.hypot(t.x - e.x, t.y - e.y) > bd + 150) t = best;
+    return (e.tgt = t);
+  }
+  asTarget(e, fn) { if (!this.coop) return fn(); return this.as(this.pickTarget(e), fn); }
+  // chạy fn cho từng nhóm địch cùng mục tiêu (g.enemies = nhóm đó)
+  byTarget(dt, fn) {
+    if (!this.coop) return fn();
+    const groups = new Map(); for (const e of this.enemies) { const t = this.pickTarget(e); if (!groups.has(t)) groups.set(t, []); groups.get(t).push(e); }
+    const outList = [];
+    for (const q of this.players) { const grp = groups.get(q); if (!grp) continue; this.enemies = grp; this.as(q, fn); outList.push(...this.enemies); }
+    this.enemies = outList;
+  }
+  // một người gục: co-op thì nằm chờ đồng đội hồi sinh; tất cả gục thì hết lượt
+  downed(q) {
+    if (!this.coop) { this.over = true; this.emit('dead', {}); return; }
+    q.down = true; q.hp = 0; q.reviveT = 0; q.vx = q.vy = 0; q.charge = 0; q.dashT = 0; q.sdash = null; q.sdashT = 0; q.leap = null;
+    this.emit('down', { x: q.x, y: q.y, who: this.players.indexOf(q) });
+    if (this.players.every(o => o.down)) { this.over = true; this.emit('dead', {}); }
+  }
+  // dựng ván co-op: cfgs = [{ cls, element, skin, skinFx }, ...] theo thứ tự cố định (chủ phòng trước)
+  static coop(seed, cfgs, opts = {}) {
+    const N = cfgs.length, base = { ...opts, coopN: N };
+    const g = new Game(seed, cfgs[0].cls, { ...base, element: cfgs[0].element, skin: cfgs[0].skin, skinFx: cfgs[0].skinFx });
+    g.coop = N > 1;
+    for (let i = 1; i < N; i++) {
+      const t = new Game(seed, cfgs[i].cls, { ...base, element: cfgs[i].element, skin: cfgs[i].skin, skinFx: cfgs[i].skinFx }), q = t.p;
+      q.x = g.p.x + 56 * i; q.y = g.p.y + 20; g.players.push(q);
+    }
+    g.players.forEach((q, i) => { q.pi = i; });
+    return g;
+  }
+  // một khung lockstep: its[i] là input của người chơi i (cả hai máy chạy y hệt nhau)
+  stepCoop(dt, its) {
+    const P = this.players, home = this.p; this.p = P[0];
+    try { this._stepCoop(dt, its, P); } finally { this.p = home; }
+  }
+  _stepCoop(dt, its, P) {
+    P.forEach((q, i) => this.as(q, () => { const it = its[i] || {}; if (it.slots) for (const s of it.slots) this.inQ.push(typeof s === 'object' ? s.slot : s); if (it.dash) this.dashQ = true; if (it.space) this.spaceQ = true; if (it.ax !== undefined) this.aim = [it.ax, it.ay]; }));
+    if (this.over || this.state !== 'fight') return;
+    if (this.hitstop > 0) { this.hitstop -= dt; return; }
+    if (this.deathSlow > 0) { this.deathSlow -= dt; dt *= 0.3; }
+    const its2 = P.map((q, i) => this.as(q, () => {
+      let it2 = { ...(its[i] || {}), dash: this.dashQ, space: !!this.spaceQ }; this.dashQ = false; this.spaceQ = false; frozenInput(this, it2);
+      if (this.travel > 0) { const G = this.portal; it2 = G ? { mx: G.x - q.x, my: G.y - 30 - q.y, ax: G.x, ay: G.y - 60 } : {}; this.inQ = []; q.queued = null; }
+      if (q.goldT > 0 || q.down) { it2 = { ax: (its[i] || {}).ax, ay: (its[i] || {}).ay }; this.inQ = []; q.queued = null; }
+      return it2;
+    }));
+    this.t += dt; if (this.forge) this.forge.t += dt;
+    P.forEach((q, i) => this.as(q, () => {
+      const was = this.inForge; this.inForge = inForge(this, q.x, q.y); if (this.inForge && !was) enterForge(this);
+      if (q.down) return;
+      tickDefense(this, dt); this.tickPlayer(dt, its2[i]); this.updatePlayer(dt, its2[i]); this.tagOwned();
+      this.ownRun(q, ['relicFx'], () => tickRelics(this, dt));
+    }));
+    const slow = P.some(q => !q.down && q.slowmoT > 0) ? 0.35 : P.some(q => !q.down && q.slowmo) ? 0.55 : 1, wdt = dt * slow; this.timeScale = slow;
+    for (const q of P) this.ownRun(q, ['shots', 'relicFx'], () => this.updateShots(dt));
+    this.updateEnemies(wdt); this.tagOwned();
+    this.updateFoeShots(wdt);
+    const lead = this.targets()[0] || P[0];
+    this.as(lead, () => this.director(dt)); this.tagOwned();
+    if (this.over) return;
+    for (const q of P) this.ownRun(q, ['zones', 'pending', 'traps', 'walls', 'ults'], () => this.updateSkills(dt));
+    this.updatePickups(dt);
+    this.as(lead, () => envStep(this, dt)); this.tagOwned();
+    this.as(this.boss && !this.boss.dead && this.boss.tgt && !this.boss.tgt.down ? this.boss.tgt : lead, () => updateHazards(this, wdt)); this.tagOwned();
+    if (this.arena) { for (const q of P) this.clampArena(q, q.r); if (this.boss && !this.boss.dead && !this.boss.leap) this.clampArena(this.boss, this.boss.r); }
+    // hồi sinh: đứng cạnh đồng đội đang gục
+    for (const q of P) {
+      if (!q.down) continue;
+      const helper = this.targets().find(o => dist(o.x, o.y, q.x, q.y) < COOP.reviveR);
+      q.reviveT = helper ? (q.reviveT || 0) + dt : Math.max(0, (q.reviveT || 0) - dt * 0.5);
+      if (q.reviveT >= COOP.revive) { q.down = false; q.reviveT = 0; q.hp = q.max * COOP.reviveHp; q.inv = 1.5; this.emit('revived', { x: q.x, y: q.y, who: q.pi }); }
+    }
   }
   // người chơi bấm Next stage khi đang chờ ở stage có thợ rèn
   proceed() { if (!this.forgeHold || this.clearT > 0) return false; this.forgeHold = false; this.clearT = STAGE_REST; this.emit('stageCleared', { n: this.stage }); return true; }
@@ -858,7 +962,7 @@ export class Game extends Sim {
   rerollReward(paid) { const r = this.rewards[0]; if (!r) return false; if (paid) this.paidRerolls++; else if (this.rerolls > 0) this.rerolls--; else return false; r.choices = r.type === 'minor' ? rollMinor(this) : rollMajor(this); this.emit('reroll', {}); return true; }
   // hồi sinh (1 lần mỗi lượt): nửa máu, 2.5 giây bất tử, dọn đòn đang bay
   revive() { if (this.revived) return false; const p = this.p; this.revived = true; this.over = false; p.hp = p.max * 0.5; p.inv = 2.5; p.frozen = 0; p.rooted = 0; this.hazards = []; this.foes = []; this.emit('revive', { x: p.x, y: p.y }); return true; }
-  finishReward() { this.rewards.shift(); if (!this.rewards.length) { const n = this.stage + 1; if (this.onStageSave) this.onStageSave(n); this.startStage(n); } }   // onStageSave: main chụp bản lưu lượt chơi ngay trước khi vào stage mới
+  finishReward() { this.rewards.shift(); if (!this.rewards.length && this.players.every(q => !(q._rewards || []).length)) { const n = this.stage + 1; if (this.coop) return this.as(this.players[0], () => this.startStage(n)); if (this.onStageSave) this.onStageSave(n); this.startStage(n); } }   // onStageSave: main chụp bản lưu lượt chơi ngay trước khi vào stage mới
   pickMinor(id) {
     if (id && id.startsWith('core:')) { const el = id.slice(5); this.addCore({ type: 'el', el }); this.upgradeLog.push('Core ' + el); this.finishReward(); return; }
     const u = MINOR_BY_ID[id];

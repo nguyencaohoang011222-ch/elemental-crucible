@@ -5,6 +5,7 @@ const PAL = {
   B: '#4a8aff', b: '#1a3a9a', C: '#7ef0ff', c: '#2a8ab0', G: '#6ad04a', h: '#2a7a2a', P: '#b47ae8', p: '#5a2a8a', O: '#ff8a2a', N: '#9a6a34', n: '#4a2a14', S: '#f0d080', E: '#ffffff'
 };
 export const PIXEL_ICONS = {
+  duo: ['................', '....ooo.........', '...oYYYo..ooo...', '...oYYYo.oCCCo..', '...oYYYo.oCCCo..', '....ooo..oCCCo..', '...ooooo..ooo...', '..oYYYYYooooooo.', '.oYYYYYYYoCCCCCo', '.oYYYYYYoCCCCCCo', '.oYYYYYYoCCCCCCo', '.oYYYYYYoCCCCCCo', '.ooooooooCCCCCCo', '........oooooooo', '................', '................'],
   banner: ['.oo.............', 'oYYo............', '.oNooooooooooo..', '.oNoRRRRRRRRRRo.', '.oNoRrRRRRRRRo..', '.oNoRRRYYRRRRRo.', '.oNoRRYYYYRRRo..', '.oNoRRRYYRRRRRo.', '.oNoRRRRRRRRo...', '.oNoRrRoRRRo....', '.oNoooo.ooo.....', '.oNo............', '.oNo............', '.oNo............', 'oNNNo...........', 'ooooo...........'],
   skull: ['................', '.oo..........oo.', 'oSyo........oySo', '.oSyo.oooo.oySo.', '..oyyoWWWWoyyo..', '...oWWWWWWWWo...', '..oWWWWWWWWWWo..', '..oWooWWWWooWo..', '..oWoRYWWYRoWo..', '..oWooWWWWooWo..', '..oWWWWooWWWWo..', '...owWWWWWWwo...', '...oWoWoWoWoo...', '....oWoWoWoo....', '.....oooooo.....', '................'],
   swords: ['oo............oo', 'oWo..........oWo', '.oWo........oWo.', '..oWo......oWo..', '...oWo....oWo...', '....oWo..oWo....', '.....oWooWo.....', '......oWWo......', '.....oWooWo.....', '...YoWo..oWoY...', '...oYo....oYo...', '..oNoYo..oYoNo..', '.oNo.oo..oo.oNo.', 'oNo..........oNo', 'oo............oo', '................'],

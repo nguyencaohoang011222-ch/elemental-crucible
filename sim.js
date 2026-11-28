@@ -400,7 +400,7 @@ export class Sim {
     p.hp -= d; p.inv = 0.6; p.hurtT = 0.25; p.vx += Math.cos(a) * 320; p.vy += Math.sin(a) * 320;
     this.hitstop = Math.max(this.hitstop, 0.06);
     this.emit('hurt', { x: p.x, y: p.y, dmg: Math.round(d) });
-    if (p.hp <= 0) { p.hp = 0; this.over = true; this.emit('dead', {}); }
+    if (p.hp <= 0) { p.hp = 0; if (this.downed) this.downed(p); else { this.over = true; this.emit('dead', {}); } }
   }
 
   // ---------- đạo diễn: địch đông dần theo thời gian ----------

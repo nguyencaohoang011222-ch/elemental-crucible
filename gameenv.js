@@ -214,18 +214,23 @@ export function enemiesExtra(g, dt) {
 export function envStep(g, dt) {
   const p = g.p;
   g.surface.update(dt, g.rand, r => react(g, r)); g.world.tickTemp(dt);
+  const each = fn => g.forTargets ? g.forTargets(fn) : fn(p);
+  const tick0 = g.envT - dt <= 0;
+  each(p => {
   // lạnh và đóng băng
   if (p.chillT > 0) { p.chillT -= dt; if (p.chillT <= 0) p.chill = 0; }
   if (p.frozen > 0) p.frozen -= dt; if (p.rooted > 0) p.rooted -= dt; if (p.slowT > 0) p.slowT -= dt;
   if (p.burnT > 0) { p.burnT -= dt; p.burnTick = (p.burnTick || 0) - dt; if (p.burnTick <= 0) { p.burnTick = 0.5; dotPlayer(g, 5, 'burn'); } }
-  g.envT -= dt; let tick = g.envT <= 0; if (tick) g.envT = 0.35;
   // người chơi: vừa bước vào vùng gây hại thì mất máu ngay, sau đó theo nhịp
   const sp = g.surface.at(p.x, p.y), fx = SURF_FX[sp];
   const enter = fx && fx.dps && p.lastSurf !== sp; p.lastSurf = sp;
-  if (fx && fx.dps && (tick || enter) && !p.leap && !(p.z > 0)) dotPlayer(g, fx.dps * 0.35, sp);
+  if (fx && fx.dps && (tick0 || enter) && !p.leap && !(p.z > 0)) dotPlayer(g, fx.dps * 0.35, sp);
+  if (sp === 'water') p.wet = 1;
+  if (g.theme === 'dungeon' && p.dashT > 0) g.world.near(p.x, p.y, 80, o => { if (!o.dead && o.type === 'tree' && dist(o.x, o.y, p.x, p.y) < o.r + 22) sporeBurst(g, o); });
+  });
+  g.envT -= dt; let tick = g.envT <= 0; if (tick) g.envT = 0.35;
   // bom: châm ngòi khi bị đánh, nổ sau vài giây (có thể nổ dây chuyền)
   for (const o of g.fused) { if (o.dead) { g.fused.delete(o); continue; } o.fuse -= dt; if (o.fuse <= 0) { g.fused.delete(o); bombBlast(g, o); } }
-  if (sp === 'water') p.wet = 1;
   // quái
   for (const e of g.enemies) {
     if (e.dead || e.type === 'DUMMY') continue;
@@ -240,8 +245,6 @@ export function envStep(g, dt) {
     if ((z.kind === 'fire' || z.kind === 'lava') && g.rand() < dt * 3) applyEl(g, z.x + (g.rand() - 0.5) * z.r, z.y + (g.rand() - 0.5) * z.r, 26, 'FIRE', { chance: 0.7 });
     if (z.kind === 'swamp' && g.rand() < dt * 2) applyEl(g, z.x, z.y, z.r * 0.6, 'WATER', { puddle: true });
   }
-  // lướt xuyên nấm khổng lồ → bão độc
-  if (g.theme === 'dungeon' && p.dashT > 0) g.world.near(p.x, p.y, 80, o => { if (!o.dead && o.type === 'tree' && dist(o.x, o.y, p.x, p.y) < o.r + 22) sporeBurst(g, o); });
   // bẫy trần (dinh thự) / mạch phun (núi lửa)
   g.mapHz = mapHazards(g.theme, g.world.seed, p.x, p.y, 780).filter(h => !(g.forge && dist(h.x, h.y, g.forge.x, g.forge.y) < 260)); // không có bẫy trong hiên lò rèn
   for (const h of g.mapHz) {
@@ -249,7 +252,7 @@ export function envStep(g, dt) {
     g.hzPrev.set(h.id, ph);
     if (prev !== undefined && ph < prev) { // vừa hết chu kỳ: sập/phun
       g.emit(h.kind === 'vent' ? 'ventErupt' : 'trapCrash', { x: h.x, y: h.y, r: h.r });
-      if (dist(p.x, p.y, h.x, h.y) < h.r + p.r * 0.5 && !(p.z > 0)) g.hurtPlayer(26 * g.dmgScale, Math.atan2(p.y - h.y, p.x - h.x), { boss: true });
+      each(p => { if (dist(p.x, p.y, h.x, h.y) < h.r + p.r * 0.5 && !(p.z > 0)) g.hurtPlayer(26 * g.dmgScale, Math.atan2(p.y - h.y, p.x - h.x), { boss: true }); });
       for (const e of g.enemies) if (!e.dead && !e.boss && dist(e.x, e.y, h.x, h.y) < h.r + e.r) g.hurtEnemy(e, 70, Math.atan2(e.y - h.y, e.x - h.x), 300, 'trap');
       if (h.kind === 'vent') applyEl(g, h.x, h.y, 44, 'BURN', { life: 2.5 }); else g.world.damageObstacles(h.x, h.y, h.r, 80);
     }
@@ -259,7 +262,7 @@ export function envStep(g, dt) {
 function bombBlast(g, o) {
   const R = 120, p = g.p; g.world.breakObs(o);
   for (const e of g.enemies) if (!e.dead && dist(e.x, e.y, o.x, o.y) < R + e.r) g.hurtEnemy(e, e.boss ? 120 : 75, Math.atan2(e.y - o.y, e.x - o.x), 420, 'blast');
-  if (dist(p.x, p.y, o.x, o.y) < R + p.r) g.hurtPlayer(28 * g.dmgScale, Math.atan2(p.y - o.y, p.x - o.x), { boss: true });
+  const hit = q => { if (dist(q.x, q.y, o.x, o.y) < R + q.r) g.hurtPlayer(28 * g.dmgScale, Math.atan2(q.y - o.y, q.x - o.x), { boss: true }); }; if (g.forTargets) g.forTargets(hit); else hit(p);
   applyEl(g, o.x, o.y, 75, 'BURN', { life: 3 }); g.world.damageObstacles(o.x, o.y, R * 0.9, 60);
   g.emit('boom', { x: o.x, y: o.y, r: R, el: 'FIRE', big: true }); g.emit('bombBlast', { x: o.x, y: o.y, r: R }); g.hitstop = Math.max(g.hitstop, 0.06);
 }
@@ -267,7 +270,7 @@ export function dotPlayer(g, dmg, kind) {
   const p = g.p; if (g.over || g.labGod) return;
   let d = dmg * g.diff.dmg * (1 - p.mods.dr); if (g.infHp) { d = Math.min(d, Math.max(0, p.hp - 1)); p.hurtClock = 0; } p.hp -= d; p.hurtT = Math.max(p.hurtT || 0, 0.14); p.vy -= 40;
   g.emit('hurtDot', { x: p.x, y: p.y, dmg: Math.max(1, Math.round(d)), kind });
-  if (p.hp <= 0) { p.hp = 0; g.over = true; g.emit('dead', {}); }
+  if (p.hp <= 0) { p.hp = 0; if (g.downed) g.downed(p); else { g.over = true; g.emit('dead', {}); } }
 }
 export function frozenInput(g, it) { const p = g.p; if ((p.frozen > 0 || p.rooted > 0) && it.dash) { if (p.frozen > 0) p.frozen -= 0.35; if (p.rooted > 0) p.rooted -= 0.45; it.dash = false; g.emit('iceCrack', { x: p.x, y: p.y }); } }
 export { WARN };

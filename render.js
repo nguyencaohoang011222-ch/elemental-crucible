@@ -301,9 +301,10 @@ export class Renderer {
     const EG = this._eg || (this._eg = new Map()); EG.clear();
     for (const e of sim.enemies) { if (!e.boss && !e.cloneOf) list.push({ y: e.y, k: 1, o: e }); const kx = Math.floor(e.x / 64), ky = Math.floor(e.y / 64), key = kx * 100003 + ky; let b = EG.get(key); if (!b) EG.set(key, b = []); b.push(e); }
     list.push({ y: p.y, k: 2, o: p });
+    if (sim.coop) for (const q of sim.players) if (q !== p) list.push({ y: q.y, k: 5, o: q });
     if (!this.lowQ) for (const tu of tufts) list.push({ y: tu.y, k: 3, o: tu }); else for (const tu of tufts) list.push({ y: tu.y, k: 4, o: tu });
     list.sort((a, b) => a.y - b.y);
-    for (const it of list) { switch (it.k) { case 0: this.obstacle(ctx, it.o, it.s); break; case 1: this.enemy(ctx, it.o, sim); break; case 2: this.player(ctx, sim); break; case 3: this.tuft(ctx, it.o, sim, tk, T); break; case 4: this.tuftStill(ctx, it.o, tk, T); break; default: it.f(); } }
+    for (const it of list) { switch (it.k) { case 0: this.obstacle(ctx, it.o, it.s); break; case 1: this.enemy(ctx, it.o, sim); break; case 2: this.player(ctx, sim); if (sim.coop) this.coopTag(ctx, sim, p); break; case 5: this.partner(ctx, sim, it.o); break; case 3: this.tuft(ctx, it.o, sim, tk, T); break; case 4: this.tuftStill(ctx, it.o, tk, T); break; default: it.f(); } }
     for (const f of this.fallen) {
       f.t -= dt; const kk = 1 - f.t / f.T;
       ctx.save(); ctx.globalAlpha = Math.min(1, f.t / 0.4); ctx.translate(sn(f.x), sn(f.y));
@@ -670,7 +671,7 @@ export class Renderer {
     if (skm) SKV.dash(this, ctx, p, fr, skm, X, Y, W, H, dashing, dtn);   // bóng ảnh nhiều khung theo tư thế thật
     else if (dashing) for (let i = 1; i <= 3; i++) { ctx.save(); ctx.globalAlpha = 0.28 / i; ctx.translate(sn(p.x - dx * i * 15), sn(p.y - dy * i * 15 - z)); ctx.scale(p.face, 1); ctx.drawImage(fr.white, X, Y, W, H); ctx.restore(); }
     if (dashing && this.opts.trail) for (let i = 0; i < 3; i++) this.parts.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y - 10 + (Math.random() - 0.5) * 30, vx: -dx * 60 + (Math.random() - 0.5) * 40, vy: -dy * 60 - 20, life: 0.5, max: 0.5, c: this.opts.trail[i % 2], s: 4 });
-    const blink = p.inv > 0 && !dashing && Math.floor(t * 24) % 2;
+    const blink = (p.inv > 0 && !dashing && Math.floor(t * 24) % 2) || (p.down && Math.floor(t * 3) % 3 === 0);
     ctx.save(); ctx.translate(sn(p.x), sn(p.y - z)); ctx.scale(p.face, 1); if (gs > 1) { ctx.translate(0, 10 + z); ctx.scale(gs, gs); ctx.translate(0, -(10 + z)); } if (p.ghostT > 0) ctx.globalAlpha = 0.28; if (p.stealthT > 0) { ctx.globalAlpha = 0.22 + 0.06 * Math.sin(t * 9); ctx.translate(Math.round(Math.sin(t * 23) * 1.5) * WPP, 0); }
     if (p.hp < (this.lastHp ?? p.hp) - 0.01) { this.hurtFlash = 0.2; if (this.opts.shake) this.addShake(2.5); } this.lastHp = p.hp; this.hurtFlash = Math.max(0, (this.hurtFlash || 0) - (this.dtNow || 0.016));
     if (p.goldT > 0) { if (!fr.gold) fr.gold = tintOf(tintOf(fr.img, '#ffd34a'), '#c88a1a'); ctx.drawImage(fr.gold, X, Y, W, H); if (Math.floor(t * 8) % 3 === 0) { ctx.globalAlpha = 0.5; ctx.drawImage(fr.white, X, Y, W, H); } }
@@ -729,6 +730,24 @@ export class Renderer {
       if (p.cls === 'RANGER') { ctx.fillStyle = '#fff6a0'; const m = -Math.PI / 2 + 0.75 * 6.283; ctx.fillRect(p.x + Math.cos(m) * 28 - 2, p.y - 8 + Math.sin(m) * 28 - 2, 4, 4); ctx.save(); ctx.globalAlpha = 0.25 + 0.4 * c; ctx.strokeStyle = ready ? '#fff6a0' : '#ffffff'; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x + Math.cos(p.aim) * (300 + 400 * c), p.y - 8 + Math.sin(p.aim) * (300 + 400 * c)); ctx.stroke(); ctx.restore(); }
       if (p.cls === 'KNIGHT') { const R = 110 + 100 * c, A = 1.6 + 1.6 * c; ctx.save(); ctx.globalAlpha = 0.12 + 0.18 * c; ctx.fillStyle = ready ? '#ffd36b' : '#ffffff'; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, R, p.aim - A / 2, p.aim + A / 2); ctx.closePath(); ctx.fill(); if (c >= 0.7) { ctx.globalAlpha = 0.25; ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, R + 150, 0, 7); ctx.stroke(); } ctx.restore(); }
       if (false) { const rr = 8 + 14 * c, ox = p.x + Math.cos(p.aim - 0.5 * (p.face || 1)) * 56, oy = p.y + HAND_Y + Math.sin(p.aim - 0.5 * (p.face || 1)) * 56; ctx.fillStyle = 'rgba(155,140,255,.35)'; ctx.beginPath(); ctx.arc(ox, oy, rr + 6, 0, 7); ctx.fill(); ctx.fillStyle = '#c8b8ff'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ox - rr * 0.3, oy - rr * 0.3, rr * 0.3, 0, 7); ctx.fill(); }
+    }
+  }
+  // co-op: vẽ đồng đội bằng đúng hàm vẽ người chơi (đổi sim.p tạm thời, giữ trạng thái hoạt ảnh riêng)
+  partner(ctx, sim, q) {
+    const keep = ['lastHp', 'hurtFlash', 'lastSwing', 'swT', '_mzT', '_tipD', '_tipA'], S = q._rs || (q._rs = { swT: 0.16, lastSwing: 0 }), mine = {};
+    for (const k of keep) { mine[k] = this[k]; this[k] = S[k]; }
+    const p0 = sim.p, sh = this.shake; sim.p = q;
+    try { this.player(ctx, sim); } finally { sim.p = p0; this.shake = sh; for (const k of keep) { S[k] = this[k]; this[k] = mine[k]; } }
+    this.coopTag(ctx, sim, q);
+  }
+  coopTag(ctx, sim, q) {
+    const names = this.coopNames || [], nm = names[q.pi] || 'P' + ((q.pi || 0) + 1), me = q === sim.p, col = q.pi ? '#7fe0ff' : '#ffd36b';
+    if (!me) { const w = 46, x = sn(q.x - w / 2), y = sn(q.y - 74); ctx.fillStyle = '#100c14'; ctx.fillRect(x - 3, y - 3, w + 6, 10); ctx.fillStyle = q.down ? '#6a6a6a' : '#e0503a'; ctx.fillRect(x, y, Math.max(0, sn(w * q.hp / q.max)), 4); this.wtext(q.x, q.y - 84, nm, col, 13); }
+    if (q.down) {
+      const k = Math.min(1, (q.reviveT || 0) / 2), r = 34;
+      ctx.save(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(q.x, q.y - 6, r, 0, 6.283); ctx.stroke();
+      ctx.strokeStyle = '#7fff9a'; ctx.beginPath(); ctx.arc(q.x, q.y - 6, r, -1.571, -1.571 + 6.283 * k); ctx.stroke(); ctx.restore();
+      this.wtext(q.x, q.y + 34, me ? 'DOWN' : 'REVIVE', '#7fff9a', 13);
     }
   }
   status(ctx, e, sc) {

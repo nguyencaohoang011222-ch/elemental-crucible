@@ -30,6 +30,7 @@ import { STAT_DROPS } from './game.js';
 import { coreDef } from './kits.js';
 import { smithSprite } from './gfx/forge.js';
 import { snapshotRun, restoreRun, validRun } from './runsave.js';
+import { initCoop, openCoop, coopTick, queueCmd, CO, leave as leaveCoop } from './coop.js';
 
 const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
@@ -67,6 +68,38 @@ function resetInput() { slotQ = []; dashQ = false; spaceQ = false; moveTo = null
 function ensureAudio() { AU.ensure(); }
 addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensureAudio);
 
+// mọi thao tác UI làm thay đổi ván chơi đi qua act(): chơi đơn chạy ngay; co-op thì cả hai máy cùng áp dụng ở cùng một khung
+const ACT = {
+  pickMinor: (g, id) => g.pickMinor(id), pickMajor: (g, c) => g.pickMajor(c), skipReward: g => g.finishReward(), reroll: (g, paid) => g.rerollReward(paid),
+  swap: (g, a, b) => g.swapInv(a, b), merge: (g, idxs) => g.mergeCores(idxs), proceed: g => g.proceed(),
+  forge: (g, i) => FG.forgeCore(g, i), stat: (g, id) => FG.buyStat(g, id), pot: (g, k) => FG.buyPotion(g, k), sellCore: (g, i) => FG.sellCore(g, i), sellShard: g => FG.sellShard(g),
+  buyRelic: (g, id) => RL.buyRelic(g, id), rerollRelics: (g, pay) => RL.rerollRelics(g, pay), sellRelic: (g, id) => RL.sellRelic(g, id)
+};
+function act(n, a = [], cb) { if (CO.on && game.coop) return queueCmd(n, a, cb); const r = ACT[n](game, ...a); if (cb) cb(r); return r; }
+// ---------- co-op ----------
+function startCoop(seed, cfgs, me) {
+  ensureAudio(); isTraining = false; runCfg = { ...runCfg, cls: cfgs[me].cls };
+  game = Game.coop(seed, cfgs, { difficulty: 'NORMAL' }); game.holdForge = true; game.p = game.players[me]; R.coopNames = CO.names; R.coopMe = me;
+  enterPlay(); showHint('Co-op: stay close. Stand next to a fallen friend to revive them.', 7);
+}
+function partnerLeft(msg) { if (!game.coop) return; for (const k of [...modals]) closeModal(k); toTitle(); showHint(msg || 'Your partner left.', 5); }
+function coopFrame(dt, wm) {
+  if (game.over) return;
+  if (game.state === 'reward') { if (ui === 'play' && game.rewards.length && !CO.rwBusy) openReward(); else if (!game.rewards.length && !modals.length) showHint('Waiting for your friend to pick a card…', 0.3); }
+  if (CO.wait > 0.6) showHint('Waiting for your friend…', 0.3);
+  if (game.p.down) showHint('You are down. Your friend can revive you by standing next to you.', 0.3);
+  coopTick(dt, first => {
+    const free = ui === 'play' && !modals.length && game.state === 'fight';
+    const { it, kx, ky, wasd } = free ? readInput(dt, wm) : { it: { ax: wm.x, ay: wm.y } };
+    if (first) {
+      it.slots = free ? slotQ.splice(0) : []; it.potion = free ? potQ : null; potQ = null;
+      if (dashQ && free) { const p = game.p; it.dash = true; if (TM.touchOn()) { const d = TM.dashDir(game); it.mx = d.x; it.my = d.y; } else if (!(wasd && (kx || ky))) { it.mx = wm.x - p.x; it.my = wm.y - p.y; } moveTo = null; }
+      dashQ = false; it.space = free && spaceQ; spaceQ = false;
+    } else { it.slots = []; it.fireReleased = false; }
+    return it;
+  });
+  mouse.pressed = false; mouse.released = false;
+}
 function startRun(cfg) {
   ensureAudio(); runCfg = { ...cfg }; isTraining = false; PR.clearRun();
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { element: cfg.element, difficulty: cfg.difficulty, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
@@ -102,6 +135,7 @@ function startLab(cfg) {
   enterPlay(); showLab(true);
   if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge as the square closes to cut; ' + (TM.touchOn() ? 'tap the cube button' : 'tap Shift') + ' to fold. Hold it on a foe to swap places, on yourself to confuse them. Release a full charge late to rush; keep holding to stop time. A full purple bar cheats one death.', 12);
 }
+initCoop({ game: () => game, start: startCoop, partnerLeft, ACT, openModal, closeModal, defaultCls: () => runCfg.cls, myName: () => (ON.state().nick || 'Player'), skinOf: c => PR.skinOf(c), skinFx: c => PR.skinFx(c, PR.skinOf(c)) });
 initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
 // dải chiêu Test Lab: kéo thẳng lên ô nào trên thanh chiêu thì thay ô đó
 function buildLabStrip() {
@@ -121,7 +155,7 @@ function trackEvents(evs) {
     if (e.ev === 'kill') { PR.track('kills'); const d = ENEMIES[e.type]; if (d && d.elite) { PR.track('elites'); if (Math.random() < PR.ECON.eliteChance) { PR.addGems(PR.ECON.eliteGems, 'Elite'); showHint('💎 +' + PR.ECON.eliteGems + ' from the elite!', 2); } } }
     else if (e.ev === 'bossIntro') game.noHitBoss = true;
     else if (e.ev === 'hurt' && game.boss) game.noHitBoss = false;
-    else if (e.ev === 'bossDown') { const bid = game.boss ? game.boss.def.id : e.name, n = PR.bossDefeated(bid); game.bossLoot('gem', Math.max(1, Math.min(5, n)), '+' + n + ' gems', ''); const sh = PR.rollBossShard(bid); if (sh) { game.bossLoot('bshard', 1, 'BOSS SHARD', sh.unlocked ? 'BOSS SKIN UNLOCKED: ' + sh.name + ' (' + CLASSES[sh.cls].name + ')!' : CLASSES[sh.cls].name + ' shard: ' + sh.name + ' ' + sh.count + '/' + sh.need); R.rings.push({ x: e.x, y: e.y, r: 10, R: 160, t: 0.8, T: 0.8, c: '#5af0c0', w: 6 }); } if (game.noHitBoss) PR.track('nohit'); }
+    else if (e.ev === 'bossDown') { const bid = game.boss ? game.boss.def.id : e.name, n = PR.bossDefeated(bid); if (!game.coop) game.bossLoot('gem', Math.max(1, Math.min(5, n)), '+' + n + ' gems', ''); const sh = PR.rollBossShard(bid); if (sh && game.coop) showHint(sh.unlocked ? 'BOSS SKIN UNLOCKED: ' + sh.name : CLASSES[sh.cls].name + ' shard: ' + sh.name + ' ' + sh.count + '/' + sh.need, 4); else if (sh) { game.bossLoot('bshard', 1, 'BOSS SHARD', sh.unlocked ? 'BOSS SKIN UNLOCKED: ' + sh.name + ' (' + CLASSES[sh.cls].name + ')!' : CLASSES[sh.cls].name + ' shard: ' + sh.name + ' ' + sh.count + '/' + sh.need); R.rings.push({ x: e.x, y: e.y, r: 10, R: 160, t: 0.8, T: 0.8, c: '#5af0c0', w: 6 }); } if (game.noHitBoss) PR.track('nohit'); }
     else if (e.ev === 'stageClear') PR.track('stages');
     else if (e.ev === 'forgeHold') showHint('Stage clear. Shop at ' + e.name + ' as long as you like, then press ' + (TM.touchOn() ? 'Next stage' : 'Enter or Next stage') + '.', 8);
     else if (e.ev === 'pickup' && e.hint) showHint(e.hint, 5);
@@ -437,12 +471,13 @@ function runTrailer(record, extra) {
     bag: { open() { mSel = []; renderBag(); openModal('bag'); }, sel(i) { if (!mSel.includes(i)) mSel.push(i); renderBag(); }, merge() { $('mok').click(); }, close() { if (modals.includes('bag')) closeModal('bag'); const t = $('btip'); if (t) t.style.display = 'none'; } } }, { record: !!record, ...(extra || {}) });
 }
 function pause() {
-  if (ui !== 'play') return; ui = 'pause'; resetInput();
+  if (ui !== 'play') return; if (game.coop) $('pause').classList.add('coop'); else $('pause').classList.remove('coop'); ui = 'pause'; resetInput();
   const g = game;
   renderAudio($('pauseaudio'));
   openModal('pause');
 }
 function resume() { closeModal('pause'); ui = 'play'; last = performance.now(); }
+const coopBlur = () => game.coop;
 function confirmBox(title, text, yes) {
   $('cft').textContent = title; $('cfs').textContent = text;
   $('cfyes').onclick = () => { closeModal('confirm'); yes(); };
@@ -458,6 +493,7 @@ document.addEventListener('click', e => {
   if (act === 'newrun') { if (savedRun()) confirmBox('Start a new run?', 'Your saved run (stage ' + savedRun().stage + ') will be lost.', () => { PR.clearRun(); openNewRun(); }); else openNewRun(); }
   else if (act === 'continue') continueRun();
   else if (act === 'lab') startLab(labCfg);
+  else if (act === 'coop') openCoop();
   else if (act === 'shop') openShop();
   else if (act === 'daily') openDaily();
   else if (act === 'leader') openLeader();
@@ -465,7 +501,9 @@ document.addEventListener('click', e => {
   else if (act === 'fullscreen') { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { try { screen.orientation.lock('landscape'); } catch (e) { /* trình duyệt không cho khoá */ } }).catch(() => {}); }
   else if (act === 'controls') { renderControls(); openModal('controls'); }
   else if (act === 'resume') resume();
+  else if (act === 'restart' && game.coop) { leaveCoop(); toTitle(); openCoop(); }
   else if (act === 'restart') { if (ui === 'end') { closeModal('end'); closeModal('victory'); if (isTraining) startTraining(); else openNewRun(); } else confirmBox('Restart?', 'This run will be lost.', () => isTraining ? startTraining() : startRun(runCfg)); }
+  else if (act === 'quit' && game.coop) { if (ui === 'end') { leaveCoop(); toTitle(); } else confirmBox('Leave co-op?', 'The run ends for both of you.', () => { leaveCoop(); toTitle(); }); }
   else if (act === 'quit') { if (ui === 'end') toTitle(); else { const s = !isTraining && savedRun(); confirmBox('Quit to title?', s ? 'Progress is saved at the start of stage ' + s.stage + '. Pick Continue on the title screen to resume.' : 'This run will be lost.', toTitle); } }
 });
 $('pausebtn').onclick = () => pause();
@@ -676,21 +714,23 @@ function openReward() {
 }
 function pickReward(i) {
   const r = game.rewards[0]; if (!r) return;
-  if (r.type === 'minor') { const c = r.choices[i]; if (!c) return; closeModal('reward'); game.pickMinor(c.id); if (c.core) coreHint(c.core); }
+  if (CO.on) CO.rwBusy = true;
+  const done = () => { CO.rwBusy = false; };
+  if (r.type === 'minor') { const c = r.choices[i]; if (!c) return; closeModal('reward'); act('pickMinor', [c.id], () => { done(); if (c.core) coreHint(c.core); }); }
   else {
     const c = r.choices[i]; if (!c) return;
-    closeModal('major'); game.pickMajor(c);
-    if (c.type === 'awaken') coreHint(c.el);
+    closeModal('major'); act('pickMajor', [c], () => { done(); if (c.type === 'awaken') coreHint(c.el); });
   }
   afterReward();
 }
-function afterReward() { if (game.state === 'reward') openReward(); else { ui = 'play'; last = performance.now(); } }
-$('rwskip').onclick = () => { closeModal('reward'); game.finishReward(); afterReward(); };
+function afterReward() { if (CO.on && game.coop) { ui = 'play'; return; } if (game.state === 'reward') openReward(); else { ui = 'play'; last = performance.now(); } }
+$('rwskip').onclick = () => { closeModal('reward'); if (CO.on) CO.rwBusy = true; act('skipReward', [], () => { CO.rwBusy = false; }); afterReward(); };
 function rerollLabel() { const c = game.rerollCost(); return PXI('dice', 16) + (c ? ' Reroll — ' + PXI('gem', 14) + c : ' Reroll (' + game.rerolls + ' free)'); }
 function doReroll() {
   const c = game.rerollCost();
   if (c && !PR.spend(c)) { showHint('Not enough gems for a reroll (need ' + c + ' gems). Earn gems from titans, elites, daily quests and achievements.', 3); return; }
-  game.rerollReward(c > 0); const r = game.rewards[0]; closeModal(r.type === 'minor' ? 'reward' : 'major'); openReward(); if (SFX.coreGain) SFX.coreGain();
+  const r0 = game.rewards[0]; closeModal(r0.type === 'minor' ? 'reward' : 'major'); if (CO.on) { CO.rwBusy = true; ui = 'play'; }
+  act('reroll', [c > 0], () => { CO.rwBusy = false; if (!CO.on) openReward(); if (SFX.coreGain) SFX.coreGain(); });
 }
 $('rwreroll').onclick = doReroll; $('mjreroll').onclick = doReroll;
 
@@ -721,7 +761,7 @@ function dragWire(d, i, has, onDrop) {
   if (has) { d.draggable = true; d.addEventListener('dragstart', ev => { ev.dataTransfer.setData('text/plain', String(i)); d.classList.add('drag'); }); d.addEventListener('dragend', () => d.classList.remove('drag')); }
   d.addEventListener('dragover', ev => { ev.preventDefault(); d.classList.add('over'); });
   d.addEventListener('dragleave', () => d.classList.remove('over'));
-  d.addEventListener('drop', ev => { ev.preventDefault(); d.classList.remove('over'); const raw = ev.dataTransfer.getData('text/plain'); if (raw.startsWith('core:')) { if (i >= 0) { game.p.cores[i] = JSON.parse(raw.slice(5)); game.syncOwned(); onDrop(); } return; } const from = +raw; if (Number.isFinite(from) && from !== i) { game.swapInv(from, i); mSel = mSel.map(k => k === from ? i : k === i ? from : k); onDrop(); } });
+  d.addEventListener('drop', ev => { ev.preventDefault(); d.classList.remove('over'); const raw = ev.dataTransfer.getData('text/plain'); if (raw.startsWith('core:')) { if (i >= 0) { game.p.cores[i] = JSON.parse(raw.slice(5)); game.syncOwned(); onDrop(); } return; } const from = +raw; if (Number.isFinite(from) && from !== i) { act('swap', [from, i], () => { mSel = mSel.map(k => k === from ? i : k === i ? from : k); onDrop(); }); } });
 }
 // cột Build (phải) của túi đồ: chỉ số sống còn, relic (ô 24px + tooltip), đồ rèn/mua, nâng cấp
 const RELIC_ICON = { unstable: 'dice', static: 'bolt', potato: 'flame', polter: 'eye', bats: 'bell', cursed: 'skull', blood: 'heart', overclock: 'hourglass', chain: 'sparkle', glass: 'gem', gambit: 'trophy', boomerang: 'restart', blackhole: 'star', wild: 'music', echo: 'sound', gravity: 'gear', bloodmagic: 'potion', overload: 'banner', spellblade: 'anvil', relentless: 'swords', juggernaut: 'boot', riposte: 'shield' };
@@ -797,7 +837,7 @@ function renderBag() {
 $('mclear').onclick = () => { mSel = []; renderBag(); };
 $('mswap').onclick = () => { if (mSel.length !== 2) return; game.swapInv(mSel[0], mSel[1]); mSel = []; renderBag(); };
 $('mrev').onclick = () => { mSel.reverse(); renderBag(); };
-$('mok').onclick = () => { const r = game.mergeCores(mSel.slice()); if (r.error) return; mSel = []; renderBag(); SFX.merge(); game.events.length = 0; showHint(`Merged: ${r.skill.name}${r.slot < BAR_SIZE ? ' on ' + slotLabel(r.slot) : ' (in your bag — drag it onto the bar)'}.`, 5); };
+$('mok').onclick = () => act('merge', [mSel.slice()], r => { if (!r || r.error) return; mSel = []; renderBag(); SFX.merge(); game.events.length = 0; showHint(`Merged: ${r.skill.name}${r.slot < BAR_SIZE ? ' on ' + slotLabel(r.slot) : ' (in your bag — drag it onto the bar)'}.`, 5); });
 $('bagclose').onclick = () => closeBag();
 
 
@@ -813,6 +853,7 @@ function openSmith() {
 function closeSmith() { closeModal('smith'); ui = 'play'; last = performance.now(); qw.dataset.sig = ''; game.events.length = 0; }
 function smithPortrait(theme) { const k = 'sp' + theme; if (smithPortrait[k]) return smithPortrait[k]; const s = smithSprite(theme, 'wave0'), c = document.createElement('canvas'); c.width = s.img.width * 4; c.height = s.img.height * 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(s.img, 0, 0, c.width, c.height); return (smithPortrait[k] = c.toDataURL()); }
 function smithSay(s, err) { const m = $('smithmsg'); m.textContent = s; m.classList.toggle('err', !!err); }
+function smithAct(n, a, ok, sfx) { act(n, a, r => { if (modals.includes('smith')) smithDone(r, ok, sfx); }); }
 function smithDone(r, ok, sfx) { if (r && r.error) { smithSay(r.error, true); if (SFX.noEnergy) SFX.noEnergy(); } else { smithSay(ok); if (SFX[sfx]) SFX[sfx](); } game.events.length = 0; renderSmith(); }
 const GOLDI = '<i class="coin"></i>';
 function renderSmith() {
@@ -832,39 +873,39 @@ function renderSmith() {
       else { const info = forgeInfo(p.cls, coreDef(p.cls, c)); if (!info) return; body = info.kind === 'tri' ? '<p class="tri">' + info.text + '</p>' : (info.perk ? '<p class="perk">▸ ' + info.perk + '</p>' : '') + '<p class="tw">✦ ' + info.twist + '</p><p>+15% damage.</p>'; }
       const price = done ? 'Forged ✦' : GOLDI + cost + (c.type === 'tri' ? ' + ◆1' : '');
       const d = card('<span class="tag">' + ({ el: 'single', duo: 'two-element', inf: 'infused', tri: 'merge 3' })[c.type] + (i < BAR_SIZE ? ' · ' + slotLabel(i) : '') + '</span><img class="ico" src="' + iconSkill(s) + '"><div class="st"><h4>' + s.name + '</h4>' + body + '<button class="buy2"' + (done || !chk.ok ? ' disabled' : '') + '>' + price + '</button></div>', done ? 'done' : '');
-      const bt = d.querySelector('.buy2'); if (!done && chk.ok) bt.onclick = () => smithDone(FG.forgeCore(g, i), 'Forged: ' + g.coreSkill(c).name + '!', 'forged'); else if (!done) bt.title = chk.error;
+      const bt = d.querySelector('.buy2'); if (!done && chk.ok) bt.onclick = () => smithAct('forge', [i], 'Forged: ' + g.coreSkill(c).name + '!', 'forged'); else if (!done) bt.title = chk.error;
     });
     if (!any) card('<div class="st"><h4>No skills to forge</h4><p>Pick up cores first.</p></div>');
   } else if (smithTab === 'relics') {
     // Cursed Relics: 3 món mỗi lần ghé, mua 1, reroll bằng vàng hoặc gem
     const done = (g.visitRelics || 0) >= RL.RELICS_PER_VISIT, rc = RL.relicRerollGold(g.relicRerolls || 0), gc = RL.RELIC_REROLL_GEMS;
     const head = card('<div class="st"><h4>' + PXI('skull', 16) + ' Cursed Relics</h4><p>' + (done ? 'You bought a relic this visit. Come back next time for a new offer.' : 'Three relics on sale this visit. You may take <b>one</b>. Every relic has a price beyond gold.') + '</p><div class="rrow"><button class="buy2 rr-g"' + (done || p.gold < rc ? ' disabled' : '') + '>' + PXI('dice', 16) + ' Reroll · ' + GOLDI + rc + '</button><button class="buy2 rr-m"' + (done || PR.P.gems < gc ? ' disabled' : '') + '>' + PXI('dice', 16) + ' Reroll · ' + PXI('gem', 14) + gc + '</button></div></div>', 'relichead');
-    head.querySelector('.rr-g').onclick = () => smithDone(RL.rerollRelics(g, 'gold'), 'The smith digs out other relics…', 'ui');
-    head.querySelector('.rr-m').onclick = () => { if (!PR.spend(gc)) { smithSay('Not enough gems.', true); return; } PR.save(); smithDone(RL.rerollRelics(g, 'gem'), 'The smith digs out other relics…', 'ui'); };
+    head.querySelector('.rr-g').onclick = () => smithAct('rerollRelics', ['gold'], 'The smith digs out other relics…', 'ui');
+    head.querySelector('.rr-m').onclick = () => { if (!PR.spend(gc)) { smithSay('Not enough gems.', true); return; } PR.save(); smithAct('rerollRelics', ['gem'], 'The smith digs out other relics…', 'ui'); };
     const RICON = { unstable: 'power', static: 'swift', potato: 'echo', polter: 'focus', bats: 'leech', cursed: 'ricochet', blood: 'edge', overclock: 'quick', chain: 'split', glass: 'heavy', gambit: 'pierce', boomerang: 'swordwave', blackhole: 'orbburst', wild: 'surge' };
     for (const id of g.relicOffer || []) { const r = RL.RELIC_BY_ID[id], own = p.relics.has(id);
       const d = card('<span class="tag">' + (r.cls ? r.cls.toLowerCase() + ' · ' : '') + 'relic</span><img class="ico" src="' + iconUpgrade(RICON[id] || 'power') + '"><div class="st"><h4>' + r.name + '</h4><p class="rpro">▲ ' + r.pro + '</p><p class="rcon">▼ ' + r.con + '</p><button class="buy2"' + (own || done || p.gold < r.price ? ' disabled' : '') + '>' + (own ? 'Owned' : GOLDI + r.price) + '</button></div>', 'relic' + (own ? ' done' : ''));
-      const bt = d.querySelector('.buy2'); if (!own && !done && p.gold >= r.price) bt.onclick = () => smithDone(RL.buyRelic(g, id), 'Relic taken: ' + r.name + '. Mind the price…', 'forged'); }
+      const bt = d.querySelector('.buy2'); if (!own && !done && p.gold >= r.price) bt.onclick = () => smithAct('buyRelic', [id], 'Relic taken: ' + r.name + '. Mind the price…', 'forged'); }
     if (p.relics.size) card('<div class="st"><h4>Your relics</h4><p>' + [...p.relics].map(id => RL.RELIC_BY_ID[id].name).join(' · ') + '</p></div>', 'relicown');
   } else if (smithTab === 'stats') {
-    for (const s of FG.STAT_SHOP) { const c = FG.statPrice(g, s.id), n = g.shopBuys[s.id] || 0; const d = card('<span class="tag">bought ' + n + '</span><img class="ico" src="' + iconUpgrade(({ hp: 'vital', dmg: 'edge', en: 'focus', cd: 'swift', spd: 'swift', dr: 'guard' })[s.id] || 'power') + '"><div class="st"><h4>' + s.name + '</h4><p>' + ((g.visitBuys || {})[s.id] ? '<b style="color:#ff8a5a">Sold out this visit.</b>' : 'One per visit · price rises ×1.25 each time.') + '</p><button class="buy2"' + ((g.visitBuys || {})[s.id] || p.gold < c ? ' disabled' : '') + '>' + GOLDI + c + '</button></div>'); d.querySelector('.buy2').onclick = () => smithDone(FG.buyStat(g, s.id), s.name + '!', 'bought'); }
+    for (const s of FG.STAT_SHOP) { const c = FG.statPrice(g, s.id), n = g.shopBuys[s.id] || 0; const d = card('<span class="tag">bought ' + n + '</span><img class="ico" src="' + iconUpgrade(({ hp: 'vital', dmg: 'edge', en: 'focus', cd: 'swift', spd: 'swift', dr: 'guard' })[s.id] || 'power') + '"><div class="st"><h4>' + s.name + '</h4><p>' + ((g.visitBuys || {})[s.id] ? '<b style="color:#ff8a5a">Sold out this visit.</b>' : 'One per visit · price rises ×1.25 each time.') + '</p><button class="buy2"' + ((g.visitBuys || {})[s.id] || p.gold < c ? ' disabled' : '') + '>' + GOLDI + c + '</button></div>'); d.querySelector('.buy2').onclick = () => smithAct('stat', [s.id], s.name + '!', 'bought'); }
   } else if (smithTab === 'pots') {
-    for (const k of ['hp', 'en']) { const P = FG.POTIONS[k], n = p.potions[k]; const d = card('<span class="tag">' + n + ' / ' + FG.POTION_MAX + '</span><div class="pot ' + k + '" style="width:48px;height:48px;flex:none"><i></i></div><div class="st"><h4>' + P.name + '</h4><p>' + P.text + ' Press <b>' + (k === 'hp' ? 1 : 2) + '</b> in battle to drink it.</p><button class="buy2"' + (p.gold < P.price || n >= FG.POTION_MAX ? ' disabled' : '') + '>' + GOLDI + P.price + '</button></div>'); d.querySelector('.buy2').onclick = () => smithDone(FG.buyPotion(g, k), P.name + ' bought.', 'bought'); }
+    for (const k of ['hp', 'en']) { const P = FG.POTIONS[k], n = p.potions[k]; const d = card('<span class="tag">' + n + ' / ' + FG.POTION_MAX + '</span><div class="pot ' + k + '" style="width:48px;height:48px;flex:none"><i></i></div><div class="st"><h4>' + P.name + '</h4><p>' + P.text + ' Press <b>' + (k === 'hp' ? 1 : 2) + '</b> in battle to drink it.</p><button class="buy2"' + (p.gold < P.price || n >= FG.POTION_MAX ? ' disabled' : '') + '>' + GOLDI + P.price + '</button></div>'); d.querySelector('.buy2').onclick = () => smithAct('pot', [k], P.name + ' bought.', 'bought'); }
   } else {
     p.cores.forEach((c, i) => { if (!c) return; const s = g.coreSkill(c), v = FG.sellPrice(c), conf = smithConfirm === i, bar = i < BAR_SIZE;
       const d = card('<span class="tag">' + (bar ? 'on bar · ' + slotLabel(i) : 'bag') + '</span><img class="ico" src="' + iconSkill(s) + '"><div class="st"><h4>' + s.name + '</h4><p>' + (conf ? '<b style="color:#ff8a5a">Click again to sell a core from your skill bar.</b>' : 'Sell this core.') + '</p><button class="buy2">+' + GOLDI + v + '</button></div>', 'sellc' + (conf ? ' confirm' : ''));
-      d.querySelector('.buy2').onclick = () => { if (bar && !conf) { smithConfirm = i; renderSmith(); return; } smithConfirm = -1; smithDone(FG.sellCore(g, i), 'Sold ' + s.name + ' for ' + v + ' gold.', 'sold'); }; });
+      d.querySelector('.buy2').onclick = () => { if (bar && !conf) { smithConfirm = i; renderSmith(); return; } smithConfirm = -1; smithAct('sellCore', [i], 'Sold ' + s.name + ' for ' + v + ' gold.', 'sold'); }; });
     // bán lại relic: bấm hai lần cho chắc, hoàn 50% giá
     for (const id of p.relics) { const r = RL.RELIC_BY_ID[id], v = RL.relicSellPrice(id), conf = smithConfirm === 'r:' + id;
       const d = card('<span class="tag">relic</span><img class="ico" src="' + iconUpgrade('power') + '"><div class="st"><h4>' + r.name + '</h4><p>' + (conf ? '<b style="color:#ff8a5a">Click again to sell. Its bonus and its curse both go away.</b>' : 'Sell this relic back for half its price. Removes its bonus and its curse.') + '</p><button class="buy2">+' + GOLDI + v + '</button></div>', 'relicsell');
-      d.querySelector('.buy2').onclick = () => { if (!conf) { smithConfirm = 'r:' + id; renderSmith(); return; } smithConfirm = -1; smithDone(RL.sellRelic(g, id), 'Sold ' + r.name + ' for ' + v + ' gold.', 'sold'); }; }
+      d.querySelector('.buy2').onclick = () => { if (!conf) { smithConfirm = 'r:' + id; renderSmith(); return; } smithConfirm = -1; smithAct('sellRelic', [id], 'Sold ' + r.name + ' for ' + v + ' gold.', 'sold'); }; }
     const n = p.shards || 0; const d = card('<span class="tag">' + n + ' owned</span><div class="st"><h4>◆ Fusion Shard</h4><p>' + GOLDI + FG.SELL.shard + ' each. The smith buys shards but never sells them.</p><button class="buy2"' + (n > 0 && !g.labShards ? '' : ' disabled') + '>+' + GOLDI + FG.SELL.shard + '</button></div>');
-    d.querySelector('.buy2').onclick = () => smithDone(FG.sellShard(g), 'Sold a Fusion Shard.', 'sold');
+    d.querySelector('.buy2').onclick = () => smithAct('sellShard', [], 'Sold a Fusion Shard.', 'sold');
   }
 }
 $('smithclose').onclick = () => closeSmith();
 $('tradep').onclick = () => openSmith();
-$('nextstage').onclick = e => { e.stopPropagation(); if (ui === 'play' && game.proceed) game.proceed(); };
+$('nextstage').onclick = e => { e.stopPropagation(); if (ui === 'play' && game.forgeHold) act('proceed'); };
 
 // ---------- input ----------
 addEventListener('keydown', e => {
@@ -896,14 +937,14 @@ addEventListener('keydown', e => {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') spaceQ = true;   // Axiom: Gập
   if (e.code === 'Digit1') potQ = 'hp'; if (e.code === 'Digit2') potQ = 'en';
   if (e.code === 'KeyT') openSmith();
-  if (e.code === 'Enter' && game.forgeHold) game.proceed();
+  if (e.code === 'Enter' && game.forgeHold) act('proceed');
   if (e.code === 'Tab' || e.code === 'KeyI') openBag();
   if (e.code === 'Escape') pause();
   if (e.code === 'KeyP') pause();
   if (e.code === 'F2') { e.preventDefault(); toggleLab(); }
 });
 addEventListener('keyup', e => keys.delete(e.code));
-addEventListener('blur', () => { keys.clear(); mouse.down = mouse.rdown = false; if (SET.autopause && ui === 'play') pause(); });
+addEventListener('blur', () => { keys.clear(); mouse.down = mouse.rdown = false; if (SET.autopause && ui === 'play' && !coopBlur()) pause(); });
 const toCanvas = e => { const r = cv.getBoundingClientRect(); mouse.x = (e.clientX - r.left) * cv.width / r.width; mouse.y = (e.clientY - r.top) * cv.height / r.height; };
 addEventListener('mousemove', toCanvas);
 function worldMouse() { const [x, y] = R.toWorld(mouse.x, mouse.y); return { x, y }; }
@@ -1007,7 +1048,7 @@ function groupBuild(log) {
     : '<span class="eup">' + PXI('sparkle', 14) + o.name + (o.n > 1 ? ' <em>×' + o.n + '</em>' : '') + '</span>').join('');
 }
 function showVictory() {
-  ui = 'end'; const g = game; if (SFX.victory) SFX.victory(); else if (SFX.bossDown) SFX.bossDown(); if (!isTraining) PR.clearRun();
+  ui = 'end'; const g = game; $('victory').classList.toggle('coop', !!g.coop); if (SFX.victory) SFX.victory(); else if (SFX.bossDown) SFX.bossDown(); if (!isTraining) PR.clearRun();
   if (!isTraining && !g.gemsPaid) g.gemsPaid = runEndedOnline(g.stage, true, g.p.cls, g.difficulty);
   const R0 = g.gemsPaid || { gems: 0, bonus: [], unlocks: [], ach: [] }, cls = g.p.cls, tm = Math.floor(g.t);
   $('vsub').innerHTML = '<b>' + CLASSES[cls].name + '</b> broke all five titans' + (g.difficulty === 'HARD' ? '<span class="hard">HARD</span>' : '');
@@ -1026,7 +1067,7 @@ function showVictory() {
 }
 function showEnd() {
   if (game.won) return showVictory();
-  ui = 'end'; const g = game, won = g.won; if (!won && SFX.dead) SFX.dead(); if (!isTraining) PR.clearRun();
+  ui = 'end'; const g = game, won = g.won; if (!won && SFX.dead) SFX.dead(); $('end').classList.toggle('coop', !!g.coop); if (!isTraining) PR.clearRun();
   $('endt').textContent = won ? 'The Titans Have Fallen' : 'You Have Fallen'; $('endt').style.color = won ? 'var(--gold)' : 'var(--bad)';
   $('ends').textContent = won ? `${CLASSES[g.p.cls].name} conquered all ${LAST_STAGE} stages${g.difficulty === 'HARD' ? ' on Hard' : ''}.` : `${CLASSES[g.p.cls].name} fell on stage ${g.stage}${g.boss ? ' to ' + g.boss.def.name : ''}.`;
   const m = Math.floor(g.t / 60), s = Math.floor(g.t % 60);
@@ -1034,7 +1075,7 @@ function showEnd() {
   $('endstats').innerHTML = S.map(([k, , , l]) => '<div class="estat">' + eicon(k) + '<div><b>0</b><span>' + l + '</span></div></div>').join('');
   [...$('endstats').children].forEach((c, i) => countUp(c.querySelector('b'), S[i][1], S[i][2]));
   $('endups').innerHTML = groupBuild(g.upgradeLog);
-  const canRevive = !won && !g.revived && !isTraining; $('revivebtn').classList.toggle('hidden', !canRevive); $('revivebtn').textContent = 'Revive · ' + PR.ECON.revive + ' gems' + (PR.P.gems < PR.ECON.revive ? ' (not enough)' : '');
+  const canRevive = !won && !g.revived && !isTraining && !g.coop; $('revivebtn').classList.toggle('hidden', !canRevive); $('revivebtn').textContent = 'Revive · ' + PR.ECON.revive + ' gems' + (PR.P.gems < PR.ECON.revive ? ' (not enough)' : '');
   if (!isTraining && !g.gemsPaid) { g.gemsPaid = won || !canRevive ? runEndedOnline(g.stage, won, g.p.cls) : null; }
   if (g.gemsPaid) { const ach = g.gemsPaid.ach.length ? '<span class="ach">' + g.gemsPaid.ach.map(a => a.text).join(', ') + '</span>' : ''; $('endgems').innerHTML = GEM(20) + '<span><span class="gn">0</span> Gems Earned</span>' + ach + '<span class="tot">Total: ' + GEM(14) + PR.P.gems + '</span>'; countUp($('endgems').querySelector('.gn'), g.gemsPaid.gems, v => '+' + v); }
   else $('endgems').innerHTML = canRevive ? '<span style="color:#9aa09d;font-weight:600">Revive once per run to keep going.</span>' : '';
@@ -1046,29 +1087,35 @@ var autoLow = false, slowT = 0;   // var: saveSet() gọi applyGfx() từ đầu
 function applyGfx() { R.lowQ = SET.gfx === 'low' || (SET.gfx === 'auto' && autoLow); }
 // ---------- vòng lặp ----------
 let last = performance.now(), acc = 0;
+// input của người chơi trên máy này trong một khung (dùng chung cho chơi đơn và co-op)
+function readInput(dt, wm) {
+  const p = game.p, wasd = SET.control === 'wasd';
+  const kx = (keys.has('ArrowRight') || (wasd && keys.has('KeyD')) ? 1 : 0) - (keys.has('ArrowLeft') || (wasd && keys.has('KeyA')) ? 1 : 0);
+  const ky = (keys.has('ArrowDown') || (wasd && keys.has('KeyS')) ? 1 : 0) - (keys.has('ArrowUp') || (wasd && keys.has('KeyW')) ? 1 : 0);
+  if (kx || ky || wasd) { moveTo = null; attackT = null; }
+  if (mouse.rdown && !attackT) moveTo = { x: wm.x, y: wm.y };
+  const it = { mx: kx, my: ky, ax: wm.x, ay: wm.y, cx: wm.x, cy: wm.y };
+  const range = p.cls === 'KNIGHT' || p.cls === 'AXIOM' ? 64 : p.cls === 'RANGER' ? 330 : 290;
+  let autoFire = false;
+  if (attackT && (attackT.dead || !game.enemies.includes(attackT))) attackT = null;
+  if (attackT) { const d = Math.hypot(attackT.x - p.x, attackT.y - p.y) - (attackT.r || 16); it.ax = attackT.x; it.ay = attackT.y; if (d > range) { it.mx = attackT.x - p.x; it.my = attackT.y - p.y; } else autoFire = true; }
+  else if (moveTo) { const d = Math.hypot(moveTo.x - p.x, moveTo.y - p.y); if (d < 8) moveTo = null; else { it.mx = moveTo.x - p.x; it.my = moveTo.y - p.y; } }
+  it.fire = autoFire; it.fireHeld = mouse.down; it.fireReleased = mouse.released;
+  if (TM.touchOn()) TM.touchInput(it, game, dt);
+  it.spaceHeld = it.spaceHeld || keys.has('ShiftLeft') || keys.has('ShiftRight');
+  return { it, kx, ky, wasd };
+}
 function frame(now, manual) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (ui === 'trailer') { AU.music(null); AU.duck(false); trailerFrame(dt); if (!manual) requestAnimationFrame(frame); return; }   // trailer tự phát nhạc riêng: tắt nhạc sảnh/biome
   if (!manual && ui === 'play' && SET.gfx === 'auto' && !autoLow && !document.hidden) { slowT = R.fps < 45 ? slowT + dt : Math.max(0, slowT - dt * 0.5); if (slowT > 3) { autoLow = true; applyGfx(); } }
   const wm = worldMouse();
-  if (ui === 'play' && !game.over) {
+  if (CO.on && game.coop && ui !== 'title') coopFrame(dt, wm);
+  else if (ui === 'play' && !game.over) {
     if (game.state === 'reward') openReward();
     else {
       acc += dt;
-      const p = game.p, wasd = SET.control === 'wasd';
-      const kx = (keys.has('ArrowRight') || (wasd && keys.has('KeyD')) ? 1 : 0) - (keys.has('ArrowLeft') || (wasd && keys.has('KeyA')) ? 1 : 0);
-      const ky = (keys.has('ArrowDown') || (wasd && keys.has('KeyS')) ? 1 : 0) - (keys.has('ArrowUp') || (wasd && keys.has('KeyW')) ? 1 : 0);
-      if (kx || ky || wasd) { moveTo = null; attackT = null; }
-      if (mouse.rdown && !attackT) moveTo = { x: wm.x, y: wm.y };
-      const it = { mx: kx, my: ky, ax: wm.x, ay: wm.y, cx: wm.x, cy: wm.y };
-      const range = p.cls === 'KNIGHT' || p.cls === 'AXIOM' ? 64 : p.cls === 'RANGER' ? 330 : 290;
-      let autoFire = false;
-      if (attackT && (attackT.dead || !game.enemies.includes(attackT))) attackT = null;
-      if (attackT) { const d = Math.hypot(attackT.x - p.x, attackT.y - p.y) - (attackT.r || 16); it.ax = attackT.x; it.ay = attackT.y; if (d > range) { it.mx = attackT.x - p.x; it.my = attackT.y - p.y; } else autoFire = true; }
-      else if (moveTo) { const d = Math.hypot(moveTo.x - p.x, moveTo.y - p.y); if (d < 8) moveTo = null; else { it.mx = moveTo.x - p.x; it.my = moveTo.y - p.y; } }
-      it.fire = autoFire; it.fireHeld = mouse.down; it.fireReleased = mouse.released;
-      if (TM.touchOn()) TM.touchInput(it, game, dt);
-      it.spaceHeld = it.spaceHeld || keys.has('ShiftLeft') || keys.has('ShiftRight');
+      const p = game.p, { it, kx, ky, wasd } = readInput(dt, wm);
       let steps = 0;
       while (acc >= 1 / 60 && steps < 4) {
         // phím chỉ được lấy ra khỏi hàng đợi khi thực sự có bước mô phỏng → không còn mất phím trên màn hình >60Hz
@@ -1129,7 +1176,7 @@ const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return 
 // kết thúc lượt: thưởng gem như cũ + gửi thành tích lên bảng xếp hạng (bỏ qua Test Lab / luyện tập)
 function runEndedOnline(stage, won, cls, diff) {
   const r = PR.runEnded(stage, won, cls, diff);
-  if (!isTraining && !game.lab && !game.training) ON.submitRun({ stage, time: game.t, cls, won, difficulty: diff || game.difficulty });
+  if (!isTraining && !game.lab && !game.training && !game.coop) ON.submitRun({ stage, time: game.t, cls, won, difficulty: diff || game.difficulty });
   return r;
 }
 function renderAcct(s) {
