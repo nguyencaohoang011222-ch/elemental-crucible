@@ -854,6 +854,10 @@ function renderSmith() {
     p.cores.forEach((c, i) => { if (!c) return; const s = g.coreSkill(c), v = FG.sellPrice(c), conf = smithConfirm === i, bar = i < BAR_SIZE;
       const d = card('<span class="tag">' + (bar ? 'on bar · ' + slotLabel(i) : 'bag') + '</span><img class="ico" src="' + iconSkill(s) + '"><div class="st"><h4>' + s.name + '</h4><p>' + (conf ? '<b style="color:#ff8a5a">Click again to sell a core from your skill bar.</b>' : 'Sell this core.') + '</p><button class="buy2">+' + GOLDI + v + '</button></div>', 'sellc' + (conf ? ' confirm' : ''));
       d.querySelector('.buy2').onclick = () => { if (bar && !conf) { smithConfirm = i; renderSmith(); return; } smithConfirm = -1; smithDone(FG.sellCore(g, i), 'Sold ' + s.name + ' for ' + v + ' gold.', 'sold'); }; });
+    // bán lại relic: bấm hai lần cho chắc, hoàn 50% giá
+    for (const id of p.relics) { const r = RL.RELIC_BY_ID[id], v = RL.relicSellPrice(id), conf = smithConfirm === 'r:' + id;
+      const d = card('<span class="tag">relic</span><img class="ico" src="' + iconUpgrade('power') + '"><div class="st"><h4>' + r.name + '</h4><p>' + (conf ? '<b style="color:#ff8a5a">Click again to sell. Its bonus and its curse both go away.</b>' : 'Sell this relic back for half its price. Removes its bonus and its curse.') + '</p><button class="buy2">+' + GOLDI + v + '</button></div>', 'relicsell');
+      d.querySelector('.buy2').onclick = () => { if (!conf) { smithConfirm = 'r:' + id; renderSmith(); return; } smithConfirm = -1; smithDone(RL.sellRelic(g, id), 'Sold ' + r.name + ' for ' + v + ' gold.', 'sold'); }; }
     const n = p.shards || 0; const d = card('<span class="tag">' + n + ' owned</span><div class="st"><h4>◆ Fusion Shard</h4><p>' + GOLDI + FG.SELL.shard + ' each. The smith buys shards but never sells them.</p><button class="buy2"' + (n > 0 && !g.labShards ? '' : ' disabled') + '>+' + GOLDI + FG.SELL.shard + '</button></div>');
     d.querySelector('.buy2').onclick = () => smithDone(FG.sellShard(g), 'Sold a Fusion Shard.', 'sold');
   }

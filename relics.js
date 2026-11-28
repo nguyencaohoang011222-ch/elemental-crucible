@@ -53,6 +53,29 @@ export function buyRelic(g, id) {
   r.apply(p.mods, g); g.refreshStats(false); g.upgradeLog.push('Relic: ' + r.name); g.emit('bought', { id: 'relic:' + id }); return { cost: r.price };
 }
 
+// ---------- bán lại relic: hoàn 50% giá, gỡ cả lợi lẫn hại ----------
+// mọi relic chỉ bật cờ hoặc nhân chỉ số, nên dò hiệu ứng bằng cách áp lên hai bản nháp:
+// khoá có kết quả không phụ thuộc giá trị cũ là cờ (gỡ đi), còn lại là hệ số nhân (chia ngược lại).
+export const relicSellPrice = id => { const r = RELIC_BY_ID[id]; return r ? Math.round(r.price * 0.5 / 5) * 5 : 0; };
+function relicEffect(r) {
+  const fakeG = { p: { hp: 0, max: 0 } }, probe = base => new Proxy({}, { get: (o, k) => (k in o ? o[k] : base), set: (o, k, v) => { o[k] = v; return true; } }), a = probe(1), b = probe(2);
+  r.apply(a, fakeG); r.apply(b, fakeG);
+  const fx = {};
+  for (const k of Object.keys(a)) { const v1 = a[k], v2 = b[k]; fx[k] = Math.abs(v2 - 2 * v1) < 1e-9 && Math.abs(v1 - 1) > 1e-9 ? { mul: v1 } : Math.abs(v2 - v1) < 1e-9 ? { flag: true } : { mul: v1 }; }
+  return fx;
+}
+export function sellRelic(g, id) {
+  const p = g.p, r = RELIC_BY_ID[id]; if (!r || !(p.relics && p.relics.has(id))) return { error: 'You do not own that relic.' };
+  const m = p.mods;
+  for (const [k, e] of Object.entries(relicEffect(r))) { if (e.flag) delete m[k]; else if (e.mul && typeof m[k] === 'number') { m[k] /= e.mul; if (Math.abs(m[k] - 1) < 1e-9 && /Mul$/.test(k)) delete m[k]; } }
+  p.relics.delete(id);
+  if (id === 'boomerang') g.relicFx = (g.relicFx || []).filter(f => f.type !== 'blade');
+  if (id === 'static') p.static = 0;
+  const i = g.upgradeLog.lastIndexOf('Relic: ' + r.name); if (i >= 0) g.upgradeLog.splice(i, 1);
+  const v = relicSellPrice(id); p.gold += v; g.refreshStats(false); g.emit('sold', { id: 'relic:' + id, v });
+  return { gold: v };
+}
+
 // ---------- runtime hooks ----------
 const near = (g, x, y, R, skip) => { let best = null, bd = R; for (const e of g.enemies) { if (e.dead || e.type === 'DUMMY' && false || (skip && skip.has(e))) continue; const d = dist(x, y, e.x, e.y); if (d < bd) { bd = d; best = e; } } return best; };
 // quanh đòn thường: trả về 'block' (không được đánh) hoặc hàm dọn dẹp chạy sau khi đánh

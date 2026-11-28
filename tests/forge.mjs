@@ -117,4 +117,13 @@ const forged = (cls, core) => { const g = new Game(6, cls, { training: true, lab
   placeForge(g, FG.FORGE_R, true); const F = g.forge, d = Math.hypot(F.x - g.p.x, F.y - g.p.y); g.p.x = F.x; g.p.y = F.y + 20; g.step(1 / 60, {});
   ok(F && F.theme === 'volcano' && d < 340 && g.inForge, `Test Lab: smith spawns ${Math.round(d)}px away in the current map, and you can trade`);
   removeForge(g); ok(!g.forge && !g.world.temp.some(o => o.type === 'forgehouse'), 'Test Lab: smith can be removed'); }
+// ---------- bán relic ----------
+{ const RL = await import('../relics.js'); const { Game } = await import('../game.js');
+  const sellCase = (cls, id) => { const g = new Game(9, cls, { element: 'FIRE' }), p = g.p, m0 = JSON.stringify(p.mods), max0 = p.max, en0 = p.energyMax;
+    g.relicOffer = [id]; g.visitRelics = 0; p.gold = 1000; const b = RL.buyRelic(g, id); if (b.error) return b.error;
+    const gold1 = p.gold, r = RL.sellRelic(g, id);
+    const same = JSON.stringify(p.mods) === m0 || Object.entries(JSON.parse(m0)).every(([k, v]) => typeof v !== 'number' || Math.abs(p.mods[k] - v) < 1e-9) && Object.keys(p.mods).every(k => k in JSON.parse(m0));
+    return same && !p.relics.has(id) && p.gold === gold1 + RL.relicSellPrice(id) && p.max === max0 && p.energyMax === en0 && !g.upgradeLog.includes('Relic: ' + RL.RELIC_BY_ID[id].name) ? 'ok' : 'mods ' + JSON.stringify(p.mods); };
+  for (const r of RL.RELICS) { const cls = r.cls || 'KNIGHT', res = sellCase(cls, r.id); ok(res === 'ok', 'selling ' + r.name + ' restores stats and refunds half (' + res + ')'); }
+  const g = new Game(9, 'KNIGHT', { element: 'FIRE' }); ok(RL.sellRelic(g, 'glass').error, 'cannot sell a relic you do not own'); }
 process.exitCode = fail ? 1 : 0;
