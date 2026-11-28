@@ -34,7 +34,7 @@ import { drawUlts, ultEvent, drawUltEvents, ultCastFx } from './gfx/ultvfx.js';
 import { drawRelics } from './gfx/relicvfx.js';
 import { drawSigils, drawFoeTells, drawFoeShot, drawLobs, holeEye, reticle, drawIceSpikes } from './gfx/foevfx.js';
 import { HAND_Y } from './gfx/skinlines.js';
-import { axiomEvent, axiomUnder, axiomOver } from './gfx/axiomfx.js';
+import { axiomEvent, axiomUnder, axiomOver, axiomScreen } from './gfx/axiomfx.js';
 import { Rig, heroPose, enemyPose, bossPose, weapon, ENEMY_SIZE, ENEMY_FEET, BOSS_DRAW, HERO_MX, HERO_MY, skinWeapon, lookAnim, staffTip } from './gfx/rig.js';
 import { EL_INFO, GROUP_COLOR } from './kits.js';
 import { BOSS_DEFS } from './boss.js';
@@ -93,7 +93,7 @@ export class Renderer {
   // camZoom: hệ số zoom camera (trailer: 0.85 → 1.4); camTarget: điểm camera bám thay cho người chơi (lia sang boss)
   toScreen(x, y) { const z = this.zoom * (this.camZoom || 1); return [(x - this.camX) * z + this.W / 2, (y - this.camY) * z + this.H / 2]; }
   toWorld(sx, sy) { const z = this.zoom * (this.camZoom || 1); return [(sx - this.W / 2) / z + this.camX, (sy - this.H / 2) / z + this.camY]; }
-  reset() { this.fadeHold = false; this.fadeIn = 0; this.flashW = 0; this.bolts = []; this.lavaPts = []; this.streaks = []; this.stars = []; this.circles = []; this.claws = []; this.cracks = []; this.fallen = []; this.lobs = []; this.camX = 0; this.camY = 0; this.shake = 0; this.parts = []; this.nums = []; this.rings = []; this.slashes = []; this.decals = []; this.beams = []; this.spikes = []; this.castText = null; this.flash = 0; this.time = 0; this.banner = null;
+  reset() { this.axShat = null; this.axFx = []; this.fadeHold = false; this.fadeIn = 0; this.flashW = 0; this.bolts = []; this.lavaPts = []; this.streaks = []; this.stars = []; this.circles = []; this.claws = []; this.cracks = []; this.fallen = []; this.lobs = []; this.camX = 0; this.camY = 0; this.shake = 0; this.parts = []; this.nums = []; this.rings = []; this.slashes = []; this.decals = []; this.beams = []; this.spikes = []; this.castText = null; this.flash = 0; this.time = 0; this.banner = null;
     this.skl = []; this.skdec = []; this.skx = []; this.skrib = []; this.skp = []; this.skg = []; this.skgh = []; this.skfoot = []; this._skUlt = null; this._skKick = null; }   // hiệu ứng skin không sót sang trận/xem trước mới
   // mỗi pixel khung = P điểm màn hình (số nguyên), khung cao khoảng 225 pixel
   resize(w, h) {
@@ -469,6 +469,7 @@ export class Renderer {
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, sim.boss ? 'rgba(20,0,0,.45)' : 'rgba(0,0,0,.28)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     SKV.screen(this, ctx, sim, dt, W, H);
     if (sim.timeScale && sim.timeScale < 1 && !this._skSlowmo) { ctx.fillStyle = 'rgba(80,140,255,.12)'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = 'rgba(160,200,255,.35)'; ctx.lineWidth = 10; ctx.strokeRect(0, 0, W, H); }
+    if (this.axShat) axiomScreen(this, ctx, W, H, dt);
     if (this.flashW > 0) { this.flashW -= dt; ctx.fillStyle = `rgba(255,250,235,${Math.max(0, this.flashW) * 2})`; ctx.fillRect(0, 0, W, H); }
     {   // màn tối dạng pixel khi dọn stage / bước qua cổng, giữ tối suốt màn thưởng, sáng dần khi vào stage mới
       let dk = 0;

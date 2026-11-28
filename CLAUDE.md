@@ -51,5 +51,5 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 ## Axiom (experimental hero, Test Lab only)
 
 - `CLASSES.AXIOM.lab` hides it from New Run. Combat logic is in `axiom.js`, sprite and poses in `gfx/axiomrig.js`, effects in `gfx/axiomfx.js`; test `tests/axiom.mjs`.
-- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes. Element skills temporarily reuse the Knight kit.
-- Not done yet: Illusion resource, swaps, enemy infighting, screen-shatter death cheat, style rank, the two cube ultimates, own 16 skills, portrait / diorama / skins, run save of `p.ax`.
+- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes, Illusion bar with hold-to-swap, double swap, confusion (`confusedStep` replaces enemy AI) and the Mirror Break death cheat with a screen shatter (one snapshot per use). Element skills temporarily reuse the Knight kit.
+- Not done yet: style rank, the two cube ultimates, own 16 skills, portrait / diorama / skins, run save of `p.ax`.

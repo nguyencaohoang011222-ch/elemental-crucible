@@ -1,6 +1,6 @@
 // Lõi một lượt chơi: 20 stage, boss ở 5/10/15/20, nâng cấp sau mỗi wave, nâng cấp lớn ở đầu stage 3/7/12/18.
 // Mỗi ô trên thanh là một lõi (chiêu đã ghép sẵn): bấm 1 phím là tung. Ghép lõi trong túi đồ.
-import { mirrorDodge } from './axiom.js';
+import { mirrorDodge, mirrorBreak, confusedStep } from './axiom.js';
 import { Sim, ENEMIES, CLASSES, dist, angDiff } from './sim.js';
 import { EL, skillDef, coreDef, coreKey, coreEls, mergeResult, skillPower } from './kits.js';
 import { defaultMods, rollMinor, rollMajor, MINOR_BY_ID } from './upgrades.js';
@@ -526,6 +526,7 @@ export class Game extends Sim {
     let d = dmg * dm * (opts.boss ? 1 : this.dmgScale) * this.diff.dmg * (1 - p.mods.dr) * (p.giant > 0 ? (p.giantDr || 0.5) : 1) * (p.mods.takenMul || 1);
     if (this.infHp) { d = Math.min(d, Math.max(0, p.hp - 1)); p.hurtClock = 0; }
     if (p.shield > 0) { const ab = Math.min(p.shield, d); p.shield -= ab; d -= ab; this.emit('shieldHit', { x: p.x, y: p.y }); if (p.shieldBurn) for (const e of this.enemies) if (!e.dead && dist(e.x, e.y, p.x, p.y) < 90) e.burn = Math.max(e.burn, p.shieldBurn); if (d <= 0) { p.inv = 0.3; return; } }
+    if (p.cls === 'AXIOM' && d >= p.hp && mirrorBreak(this, a)) return;   // Gương Vỡ: cái chết hoá ra là giả
     const vx0 = p.vx, vy0 = p.vy;
     super.hurtPlayer(d, a);
     if (p.steadyT > 0 || p.giant > 0) { p.vx = vx0; p.vy = vy0; }
@@ -681,7 +682,8 @@ export class Game extends Sim {
       if (!e.boss) for (const w of this.walls) { const s = segDist(e.x, e.y, w), r = e.r + 8; if (s.d < r) { e.x += s.nx * (r - s.d); e.y += s.ny * (r - s.d); } }
     }
     const dummies = [], bosses = [], minions = [];
-    for (const e of this.enemies) (e.type === 'DUMMY' ? dummies : e.boss ? bosses : minions).push(e);
+    const confused = [];   // bị Nhiễu Thực Tại: không chạy AI thường
+    for (const e of this.enemies) (e.type === 'DUMMY' ? dummies : e.boss ? bosses : e.confuse > 0 ? confused : minions).push(e);
     for (const e of dummies) { e.flash = Math.max(0, e.flash - dt); e.spawn = Math.max(0, e.spawn - dt); e.x += e.kx * dt; e.y += e.ky * dt; e.kx *= Math.exp(-14 * dt); e.ky *= Math.exp(-14 * dt); e.idle += dt; if (e.hp < e.max && e.idle > 3) e.hp = e.max; }
     const n0 = this.enemies.length; withPhantom(this, this.hidePt, () => { for (const b of bosses) bossUpdate(this, b, dt); });
     minions.push(...this.enemies.slice(n0)); // quái do boss gọi ra trong lượt này (lính nấm, phân thân) — trước đây bị mất
@@ -706,7 +708,8 @@ export class Game extends Sim {
     withPhantom(this, this.hidePt, () => enemiesExtra(this, dt));
     if (this.forge) { const F = this.forge; for (const e of this.enemies) { if (e.dead || e.type === 'DUMMY') continue; const d = dist(e.x, e.y, F.x, F.y), m = FORGE_R + e.r + 6; if (d < m && d > 0.1) { e.x = F.x + (e.x - F.x) / d * m; e.y = F.y + (e.y - F.y) / d * m; if (e.state === 'charge') { e.state = 'stagger'; e.st = 0.5; } } } }
     for (const e of this.enemies) if (e.fMark > 0) e.fMark -= dt;
-    this.enemies.push(...dummies.filter(d => !d.dead), ...bosses.filter(b => !b.dead));
+    this.enemies.push(...confused.filter(c => !c.dead), ...dummies.filter(d => !d.dead), ...bosses.filter(b => !b.dead));
+    if (confused.length) { confusedStep(this, dt, e => ENEMIES[e.type] || {}); this.enemies = this.enemies.filter(e => !e.dead); }
   }
 
   // ---------- võ đài boss ----------

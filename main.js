@@ -99,7 +99,7 @@ function startLab(cfg) {
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { training: true, lab: true, theme: cfg.theme, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
   Object.assign(game, keep);
   enterPlay(); showLab(true);
-  if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge while the square closes to leave a cut. ' + (TM.touchOn() ? 'Tap the cube button' : 'Press Shift') + ' to fold. Dash at the last moment to mirror-dodge.', 9);
+  if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge as the square closes to cut; ' + (TM.touchOn() ? 'tap the cube button' : 'tap Shift') + ' to fold. Hold it on a foe to swap places, on yourself to confuse them. A full purple bar cheats one death.', 12);
 }
 initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
 // dải chiêu Test Lab: kéo thẳng lên ô nào trên thanh chiêu thì thay ô đó
@@ -1035,6 +1035,7 @@ function frame(now, manual) {
       else if (moveTo) { const d = Math.hypot(moveTo.x - p.x, moveTo.y - p.y); if (d < 8) moveTo = null; else { it.mx = moveTo.x - p.x; it.my = moveTo.y - p.y; } }
       it.fire = autoFire; it.fireHeld = mouse.down; it.fireReleased = mouse.released;
       if (TM.touchOn()) TM.touchInput(it, game, dt);
+      it.spaceHeld = it.spaceHeld || keys.has('ShiftLeft') || keys.has('ShiftRight');
       let steps = 0;
       while (acc >= 1 / 60 && steps < 4) {
         // phím chỉ được lấy ra khỏi hàng đợi khi thực sự có bước mô phỏng → không còn mất phím trên màn hình >60Hz

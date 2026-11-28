@@ -87,6 +87,12 @@ const R = {
   axSheath: () => { const t = now(); nz(t + 0.22, 0.03, 0.12, { type: 'bandpass', f: 3200 }); osc('square', 900, t + 0.22, 0.05, 0.06, { to: 300 }); },
   axFold: e => { const t = now(); boom(t, e.box ? 1.6 : 1); [523, 784, 1047].forEach((f, i) => osc('pulse0.25', f, t + i * 0.04, 0.25, 0.04)); nz(t, 0.3, 0.09, { type: 'highpass', f: 2500 }); },
   axDodge: () => { const t = now(); osc('sine', 300, t, 0.28, 0.09, { to: 1500 }); nz(t, 0.25, 0.05, { type: 'bandpass', f: 800, to: 4000 }); },
+  axMark: () => { const t = now(); osc('triangle', 1760, t, 0.06, 0.04); },
+  axSwap: () => { const t = now(); osc('sine', 900, t, 0.16, 0.08, { to: 150 }); osc('sine', 150, t + 0.08, 0.16, 0.08, { to: 900 }); nz(t, 0.14, 0.05, { type: 'bandpass', f: 2000 }); },
+  axConfuse: () => { const t = now(); [440, 466, 415].forEach((f, i) => osc('sawtooth', f, t + i * 0.03, 0.5, 0.035, { vib: 30, vibF: 9 })); },
+  axClash: () => { const t = now(); osc('square', 700, t, 0.05, 0.04, { to: 350 }); },
+  // Gương Vỡ: im lặng, kính rạn dần, vỡ lớn, rồi "cạch"
+  axShatter: () => { const t = now(); osc('sine', 70, t, 0.3, 0.14, { to: 35 }); [0.36, 0.46, 0.55, 0.62, 0.68, 0.73].forEach((d, i) => nz(t + d, 0.04, 0.05 + i * 0.012, { type: 'highpass', f: 3500 + i * 500 })); nz(t + 0.8, 0.55, 0.16, { type: 'highpass', f: 2200 }); boom(t + 0.8, 1.4); [2093, 1760, 2637, 1397].forEach((f, i) => osc('triangle', f, t + 0.82 + i * 0.05, 0.3, 0.035)); osc('square', 900, t + 1.35, 0.05, 0.07, { to: 300 }); },
   axBlock: () => { const t = now(); osc('square', 1200, t, 0.07, 0.04, { to: 600 }); },
   axCube: () => { const t = now(); osc('triangle', 1175, t, 0.09, 0.04, { to: 1760 }); },
   parry: () => { const t = now(); osc('square', 1600, t, 0.1, 0.05, { to: 2200 }); osc('triangle', 2400, t, 0.18, 0.03); },

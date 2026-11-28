@@ -11,6 +11,7 @@ let O = null, root = null, joyEl = null, knobEl = null, atkEl = null, dashEl = n
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const atk = { id: null, down: false, seen: false, upPending: false, ox: 0, oy: 0, dx: 0, dy: 0, moved: false };
 const sk = { id: null, i: -1, ox: 0, oy: 0, dx: 0, dy: 0, aiming: false, cancel: false };
+const sp = { id: null, down: false, seen: false, upPending: false, ox: 0, oy: 0, dx: 0, dy: 0, moved: false };
 let castAim = null, castT = 0, lastDir = { x: 1, y: 0 }, barSig = '';
 
 const len = (x, y) => Math.hypot(x, y);
@@ -40,7 +41,10 @@ export function initMobile(opts) {
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   });
   dashEl.addEventListener('pointerdown', e => { e.preventDefault(); O.dash(); dashEl.classList.add('on'); setTimeout(() => dashEl.classList.remove('on'), 120); });
-  spaceEl = root.querySelector('.tspace'); spaceEl.addEventListener('pointerdown', e => { e.preventDefault(); O.space(); spaceEl.classList.add('on'); setTimeout(() => spaceEl.classList.remove('on'), 120); });
+  spaceEl = root.querySelector('.tspace'); spaceEl.addEventListener('pointerdown', e => { e.preventDefault(); cap(spaceEl, e); Object.assign(sp, { id: e.pointerId, down: true, seen: false, upPending: false, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, moved: false }); O.space(); spaceEl.classList.add('on'); });
+  spaceEl.addEventListener('pointermove', e => { if (e.pointerId !== sp.id) return; sp.dx = e.clientX - sp.ox; sp.dy = e.clientY - sp.oy; if (len(sp.dx, sp.dy) > TAP_MOVE) sp.moved = true; });
+  const spEnd = e => { if (e.pointerId !== sp.id) return; sp.id = null; sp.upPending = true; spaceEl.classList.remove('on'); };
+  spaceEl.addEventListener('pointerup', spEnd); spaceEl.addEventListener('pointercancel', spEnd);
   for (const k of ['hp', 'en']) potEls[k].addEventListener('pointerdown', e => { e.preventDefault(); O.potion(k); });
   root.addEventListener('contextmenu', e => e.preventDefault());
 }
@@ -49,7 +53,7 @@ function showJoy(on) {
   joyEl.style.left = joy.ox + 'px'; joyEl.style.top = joy.oy + 'px';
   knobEl.style.transform = `translate(${joy.x * JOY_R}px, ${joy.y * JOY_R}px)`;
 }
-export function resetTouch() { joy.id = atk.id = sk.id = null; joy.x = joy.y = 0; atk.down = atk.upPending = false; castAim = null; if (joyEl) showJoy(false); }
+export function resetTouch() { joy.id = atk.id = sk.id = null; joy.x = joy.y = 0; atk.down = atk.upPending = false; sp.id = null; sp.down = sp.upPending = false; castAim = null; if (joyEl) showJoy(false); }
 
 function nearest(g, r) { const p = g.p; let best = null, bd = r; for (const e of g.enemies) { if (e.dead || e.hp <= 0) continue; const d = len(e.x - p.x, e.y - p.y) - (e.r || 16); if (d < bd) { bd = d; best = e; } } if (g.boss && !g.boss.dead) { const b = g.boss, d = len(b.x - p.x, b.y - p.y) - (b.r || 40); if (d < bd) best = b; } return best; }
 function aimFromDrag(dx, dy) { const d = len(dx, dy) || 1, k = Math.min(1, d / AIM_PX); return { ux: dx / d, uy: dy / d, k }; }
@@ -70,6 +74,9 @@ export function touchInput(it, g, dt) {
   if (atk.upPending && atk.seen) { atk.down = false; atk.upPending = false; }
   it.fireHeld = atk.down; it.fireReleased = !atk.down && atk.seen; if (atk.down) atk.seen = true; else atk.seen = false;
   it.fire = false;
+  // nút Không gian: giữ để ngắm; kéo tới đâu ngắm tới đó, kéo về giữa nút = ngắm chính mình
+  if (sp.upPending && sp.seen) { sp.down = false; sp.upPending = false; }
+  it.spaceHeld = sp.down; if (sp.down) { sp.seen = true; if (sp.moved) it.swapAt = len(sp.dx, sp.dy) < CANCEL_PX ? { x: p.x, y: p.y } : aimPoint(g, aimFromDrag(sp.dx, sp.dy)); }
 }
 export function dashDir(g) { const m = len(joy.x, joy.y); if (m > DEAD) return { x: joy.x, y: joy.y }; const e = nearest(g, 400), p = g.p; return e ? { x: e.x - p.x, y: e.y - p.y } : lastDir; }
 
@@ -91,6 +98,6 @@ export function syncTouch(g, iconSkill) {
   skEls.forEach((el, i) => { const c = p.cores[i]; if (c) el.classList.toggle('poor', p.energy < g.coreSkill(c).cost); });
   for (const k of ['hp', 'en']) { const n = (p.potions || {})[k] || 0, el = potEls[k]; el.classList.toggle('empty', !n); const s = el.querySelector('span'); if (s && s.textContent !== String(n)) s.textContent = n; }
   dashEl.classList.toggle('cd', (p.dashCd || 0) > 0);
-  spaceEl.classList.toggle('hidden', p.cls !== 'AXIOM'); if (p.cls === 'AXIOM') spaceEl.classList.toggle('cd', !(p.ax && p.ax.planes.length));
+  spaceEl.classList.toggle('hidden', p.cls !== 'AXIOM');
 }
 export function markTouchDirty() { barSig = ''; }
