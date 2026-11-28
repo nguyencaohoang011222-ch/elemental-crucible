@@ -1005,8 +1005,8 @@ function hud(dt) {
   { const sh = game.labShards ? '∞' : String(p.shards || 0); if ($('shards').textContent !== sh) $('shards').textContent = sh; }
   { const gv = String(p.gold || 0), gb = $('goldv'); if (gb.textContent !== gv) { gb.textContent = gv; const box = $('goldbox'); box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); } }
   for (const [k, id] of [['hp', 'poth'], ['en', 'pote']]) { const n = (p.potions || {})[k] || 0, el = $(id); $(id + 'n').textContent = n; el.classList.toggle('empty', !n); el.classList.toggle('cd', p.potCd > 0); }
-  { const nb = $('nextstage'), on = !!(g.forgeHold && g.clearT <= 0 && g.state === 'fight' && !isTraining); nb.classList.toggle('hidden', !on); }
-  { const tp = $('tradep'), on = !!(g.inForge && g.forge && g.state === 'fight'); tp.classList.toggle('hidden', !on); if (on) { const nm = FG.smithOf(g.forge.theme).name; if ($('tradename').textContent !== nm) $('tradename').textContent = nm; } }
+  { const nb = $('nextstage'), on = !!(g.forgeHold && g.clearT <= 0 && g.state === 'fight' && !isTraining && !modals.length); nb.classList.toggle('hidden', !on); }
+  { const tp = $('tradep'), on = !!(g.inForge && g.forge && g.state === 'fight' && !modals.length); tp.classList.toggle('hidden', !on); if (on) { const nm = FG.smithOf(g.forge.theme).name; if ($('tradename').textContent !== nm) $('tradename').textContent = nm; } }
   $('en').style.width = Math.max(0, p.energy / p.energyMax * 100) + '%'; $('ent').textContent = Math.floor(p.energy) + ' / ' + p.energyMax;
   const bsig = SET.control + p.cores.slice(0, BAR_SIZE).map(c => c ? JSON.stringify(c) : '-').join('|');
   if (qw.dataset.sig !== bsig) { qw.dataset.sig = bsig; buildBar(); }

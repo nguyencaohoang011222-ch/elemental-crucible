@@ -316,7 +316,7 @@ export class Renderer {
     this.fallen = this.fallen.filter(f => f.t > 0);
     // hạt trôi + ánh sáng
     if (!this.lowQ) { this.amb.update(dt, this.time, T.motes); this.amb.draw(ctx, view, this.time, lights); }
-    if (this.opts.light) { this.collectLights(sim, lights); if (this.lowQ && lights.length > 24) lights.length = 24; this.light.render(ctx, view, T.dark, T.amb + (sim.boss ? 0.03 : 0), lights, this.lowQ); }
+    if (this.opts.light) { this.collectLights(sim, lights); this.cullLights(lights, view, this.lowQ ? 24 : 60); this.light.render(ctx, view, T.dark, T.amb + (sim.boss ? 0.03 : 0), lights, this.lowQ); }
     // phần phát sáng / cảnh báo: luôn rõ, không bị tối
     if (sim.arena) this.arena(ctx, sim);
     this.under(ctx, sim, true);
@@ -412,7 +412,7 @@ export class Renderer {
   }
   collectLights(sim, L) {
     const p = sim.p;
-    L.push({ x: p.x, y: p.y - 10, r: 165, i: 1 });
+    L.push({ x: p.x, y: p.y - 10, r: 165, i: 1, me: true });
     for (const s of sim.shots) L.push({ x: s.x, y: s.y, r: s.kind === 'orb' ? 36 : s.kind === 'sbolt' ? 70 + (s.r || 8) * 3 : 50, i: 0.85, c: s.kind === 'orb' ? '#c8b8ff' : ELC(s.el), glow: s.kind === 'orb' ? 0.05 : 0.22 });   // quả cầu pháp sư: ánh sáng nhỏ, không còn quầng tím mềm to
     for (const f of sim.foes) L.push({ x: f.x, y: f.y, r: 46, i: 0.8, c: f.c && f.c.length === 7 ? f.c : '#ff7af0', glow: 0.25 });
     for (const zn of sim.zones) if (zn.kind === 'fire' || zn.kind === 'lava') L.push({ x: zn.x, y: zn.y, r: zn.r * 1.6, i: 0.8, c: '#ff7a3c', glow: 0.2 });
@@ -424,7 +424,15 @@ export class Renderer {
     for (const it of sim.pickups || []) L.push({ x: it.x, y: it.y - 8, r: 50, i: 0.7, c: it.kind === 'energy' ? '#5aa8ff' : it.kind === 'heal' ? '#ff5a5a' : it.kind === 'shard' ? '#c07aff' : it.kind === 'gem' ? '#7fe0ff' : it.kind === 'bshard' ? '#5af0c0' : '#ffd36b', glow: 0.3 });
     for (const e of sim.enemies) { const ed = ENEMIES[e.type]; if (ed && ed.elite) L.push({ x: e.x, y: e.y - 20, r: 120, i: 0.8, c: ed.aura, glow: 0.2 }); }
     const b = sim.boss; if (b && !b.dead) L.push({ x: b.x, y: b.y - b.r * 0.6, r: b.r * 3.2, i: 0.95, c: b.def.accent, glow: 0.14 });
-    if (L.length > 60) L.length = 60;
+  }
+  // chỉ giữ đèn chạm màn hình; quá giới hạn thì giữ đèn gần tâm (đèn người chơi luôn giữ) và làm mờ dần vài đèn cuối,
+  // để đèn nấm/đuốc không tắt phụt mỗi khi camera qua ranh giới chunk
+  cullLights(L, view, cap) {
+    const cx = this.camX, cy = this.camY, hw = view.w / 2, hh = view.h / 2; let n = 0;
+    for (let k = 0; k < L.length; k++) { const l = L[k]; if (Math.abs(l.x - cx) > hw + l.r || Math.abs(l.y - cy) > hh + l.r) continue; l.d = l.me ? -1 : (l.x - cx) * (l.x - cx) + (l.y - cy) * (l.y - cy); L[n++] = l; }
+    L.length = n; if (n <= cap) return;
+    L.sort((a, b) => a.d - b.d); L.length = cap;
+    for (let k = Math.max(1, cap - 8); k < cap; k++) L[k].i *= (cap - k) / 9;
   }
   screenTexts(S, sim, dt) {
     const f = Math.max(0.85, this.P / 3.6), p = sim.p; S.textAlign = 'center';

@@ -20,7 +20,7 @@ export const THEMES = {
   },
   dungeon: {
     name: 'Fungal Caverns', bg: '#262830',
-    amb: 0.6, dark: '#07060f',
+    amb: 0.42, dark: '#0b0916',   // hang nấm: vẫn tối và tím nhưng nhìn rõ đường
     base: ['#3b3e4a', '#373a46', '#41444f'], baseD: '#23242d', baseL: '#4e5260', flowers: ['#d8d0c0'],
     patch: ['#38433c', '#344037'], patchD: '#24302a',
     path: ['#30323c', '#2c2e37'], pathD: '#1e1f27', pathL: '#3f4250', pebble: '#55586a',

@@ -55,7 +55,7 @@ function build() {
   const cores = { kind: 'duo', a: 'FIRE', b: 'WATER', c: 'EARTH' }, elOpts = EL.map(e => [e, EL_INFO[e].name]);
   const roster = ROSTER[g.theme] || ROSTER.forest;
   panel.append(
-    h('div', { className: 'lt' }, h('b', { textContent: 'TEST LAB' }), h('small', { textContent: ' F2 hide · Tab bag' })),
+    h('div', { className: 'lt' }, h('b', { textContent: 'TEST LAB' }), h('small', { textContent: ' F2 hide · Tab bag' }), h('button', { className: 'labx', title: 'Hide panel', ariaLabel: 'Hide panel', innerHTML: PX_X, on: { click: hideToTab } })),
     sec('World',
       sel(THEME_ORDER.map(t => [t, THEMES[t].name]), cfg.theme, v => api.restart({ ...cfg, theme: v })),
       sel(Object.keys(CLASSES).map(k => [k, CLASSES[k].name]), cfg.cls, v => api.restart({ ...cfg, cls: v })),
@@ -92,11 +92,16 @@ function build() {
   );
 }
 function refresh() { /* trạng thái được đọc trực tiếp từ game mỗi lần mở lại bảng */ }
+// nút X ở đầu panel: ẩn panel, để lại tab nhỏ 'LAB' ở mép phải (chạm được trên điện thoại) để mở lại
+const PX_X = '<svg viewBox="0 0 7 7" width="12" height="12" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h2v1H0zM1 1h2v1H1zM2 2h3v1H2zM3 3h1v1H3zM2 4h3v1H2zM1 5h2v1H1zM0 6h2v1H0zM5 0h2v1H5zM4 1h2v1H4zM4 5h2v1H4zM5 6h2v1H5z"/></svg>';
+let tab = null;
+function hideToTab() { panel.classList.add('hidden'); mode = ''; if (tab && G() && G().lab) tab.classList.remove('hidden'); }
 export function initLab(a) {
   api = a;
+  tab = h('button', { id: 'labtab', className: 'hidden', textContent: 'LAB', title: 'Show Test Lab panel', on: { click: () => showLab(true) } }); document.body.append(tab);
   panel = h('div', { id: 'labpanel', className: 'hidden', on: { mousedown: e => e.stopPropagation(), keydown: e => e.stopPropagation() } });
   document.body.append(panel);
 }
-export function showLab(on) { if (!panel) return; panel.classList.toggle('hidden', !on); if (on) build(); else mode = ''; }
-export function toggleLab() { if (panel && G() && G().lab) { const hid = panel.classList.toggle('hidden'); if (!hid) build(); } }
+export function showLab(on) { if (!panel) return; panel.classList.toggle('hidden', !on); if (tab) tab.classList.add('hidden'); if (on) build(); else mode = ''; }
+export function toggleLab() { if (panel && G() && G().lab) { const hid = panel.classList.toggle('hidden'); if (tab) tab.classList.toggle('hidden', !hid); if (!hid) build(); else mode = ''; } }
 export function rebuildLab() { if (panel && !panel.classList.contains('hidden')) build(); }
