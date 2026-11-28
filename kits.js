@@ -16,7 +16,7 @@ const S = (name, group, cd, shape, params, tags, desc) => ({ name, group, cd, sh
 export const KITS = {
   KNIGHT: {
     forms: { FIRE: 'Cleave', WATER: 'Whirl', EARTH: 'Rupture', WIND: 'Charge' },
-    'FIRE>FIRE':   S('Flame Cleave', 'DAMAGE', 4.6, 'arc', { range: 125, arc: 2.6, dmg: 55, burn: 3, crescent: { range: 320, dmg: 30, speed: 720, width: 80, burn: 2, pierce: 99 } }, ['melee'], 'A huge burning cleave that also launches a fire crescent.'),
+    'FIRE>FIRE':   S('Flame Cleave', 'DAMAGE', 5, 'arc', { range: 125, arc: 2.6, dmg: 55, burn: 3, crescent: { range: 320, dmg: 30, speed: 720, width: 80, burn: 2, pierce: 99 } }, ['melee'], 'A huge burning cleave that also launches a fire crescent.'),
     'FIRE>WATER':  S('Steam Cleave', 'CONTROL', 6, 'arc', { range: 115, arc: 2.2, dmg: 40, leave: { kind: 'steam', radius: 115, life: 3.5, offset: 90 } }, ['melee', 'zone'], 'Cleave that bursts into steam: enemies inside are blinded and their shots vanish.'),
     'FIRE>EARTH':  S('Molten Cleave', 'AREA', 7, 'arc', { range: 120, arc: 2.3, dmg: 72, stun: 0.8, leave: { kind: 'lava', radius: 85, life: 3.5, offset: 80 } }, ['melee', 'zone'], 'Heavy molten strike: stuns and leaves a lava pool.'),
     'FIRE>WIND':   S('Searing Crescent', 'DAMAGE', 5, 'arc', { range: 100, arc: 1.8, dmg: 35, crescent: { range: 470, dmg: 48, speed: 820, width: 110, burn: 3, pierce: 99 } }, ['melee', 'projectile'], 'Quick slash that sends a giant burning crescent through the whole line.'),
