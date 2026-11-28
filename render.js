@@ -119,7 +119,7 @@ export class Renderer {
       this.curTh = skTh; this.curCat = skCat; if (skTh && e.pal) e.pal = skTh.pal;
       if (skTh && skCat === 'single' && SKV.owns(skTh) && HERO_OWN.has(e.ev) && !(skTh.id === 'celestial' && e.el === 'EARTH')) { if (e.ev !== 'spike') this.addShake(e.big ? 6 : 3); SKV.event(this, e, skTh, skCat, sim.p.cls, sim); this.curTh = null; this.curCat = null; continue; }   // chiêu đơn HEROES: bỏ hẳn hình mặc định
       switch (e.ev) {
-        case 'swing': if (skTh && skCat === 'basic') { if (e.hits) this.addShake(e.charge ? 4 + e.charge * 6 : e.big ? 6 : 3); break; } this.slashes.push({ x: e.x, y: e.y, a: e.a, range: e.reach || 104, arc: e.arc || 1.4, t: e.charge ? 0.24 : 0.16, T: e.charge ? 0.24 : 0.16, c: this.curTh ? (e.charge ? this.curTh.pal[3] : this.curTh.pal[2]) : e.charge ? '#ffd36b' : e.big ? '#fff1a0' : '#ffffff', dir: e.combo % 2 ? 1 : -1, thin: !e.charge }); if (e.hits) this.addShake(e.charge ? 4 + e.charge * 6 : e.big ? 6 : 3); break;
+        case 'swing': if (skTh && skCat === 'basic') { if (e.hits) this.addShake(e.charge ? 4 + e.charge * 6 : e.big ? 6 : 3); break; } this.slashes.push({ x: e.x, y: e.y, a: e.a, range: e.reach || 104, arc: e.arc || 1.4, t: e.charge ? 0.24 : 0.16, T: e.charge ? 0.24 : 0.16, c: this.curTh ? (e.charge ? this.curTh.pal[3] : this.curTh.pal[2]) : e.charge ? '#ffd36b' : e.big ? '#fff1a0' : '#ffffff', dir: e.dir || (e.combo % 2 ? 1 : -1), thin: !e.charge }); if (e.hits) this.addShake(e.charge ? 4 + e.charge * 6 : e.big ? 6 : 3); break;
         case 'knightWave': this.rings.push({ x: e.x, y: e.y, r: 20, R: e.r, t: 0.35, T: 0.35, c: '#ffe9a0', w: 10 }); this.rings.push({ x: e.x, y: e.y, r: 10, R: e.r * 0.7, t: 0.28, T: 0.28, c: '#ffffff', w: 4 }); this.burst(e.x, e.y, '#ffe9a0', 30, 360, 4, 0.4); this.addShake(9); break;
         case 'arenaRise': for (const q of e.gone || []) this.puff(q.x, q.y, 3, 30, '#8a8270'); this.addShake(6); break;
         case 'killEnergy': if (Math.random() < 0.6) this.parts.push({ x: e.x, y: e.y - 10, vx: 0, vy: -60, life: 0.5, max: 0.5, c: '#7fb0ff', s: 5 }); break;
@@ -469,7 +469,7 @@ export class Renderer {
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, sim.boss ? 'rgba(20,0,0,.45)' : 'rgba(0,0,0,.28)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     SKV.screen(this, ctx, sim, dt, W, H);
     if (sim.timeScale && sim.timeScale < 1 && !this._skSlowmo) { ctx.fillStyle = 'rgba(80,140,255,.12)'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = 'rgba(160,200,255,.35)'; ctx.lineWidth = 10; ctx.strokeRect(0, 0, W, H); }
-    if (this.axShat) axiomScreen(this, ctx, W, H, dt);
+    if (this.axShat || this.axStopK > 0 || (p.ax && p.ax.stop)) axiomScreen(this, ctx, W, H, dt, sim);
     if (this.flashW > 0) { this.flashW -= dt; ctx.fillStyle = `rgba(255,250,235,${Math.max(0, this.flashW) * 2})`; ctx.fillRect(0, 0, W, H); }
     {   // màn tối dạng pixel khi dọn stage / bước qua cổng, giữ tối suốt màn thưởng, sáng dần khi vào stage mới
       let dk = 0;
@@ -711,7 +711,7 @@ export class Renderer {
       let off = 2.5 * p.face;   // đứng nghỉ: kiếm kéo sau
       if (p.charge > 0.05) off = 2.9 * p.face;
       if (p.swing > 0) { const k = 1 - p.swing / Math.max(0.05, this.swT); off = (-1.5 + 3 * Math.min(1, k * 1.5)) * dir; }
-      if (!(p.ax && p.ax.foldT > 0)) { ctx.rotate(off); ctx.fillStyle = '#141013'; ctx.fillRect(3, -6, 60, 9); ctx.fillStyle = '#3a3278'; ctx.fillRect(6, -3, 12, 3); ctx.fillStyle = '#a27ae0'; ctx.fillRect(18, -6, 3, 9); ctx.fillStyle = '#eef4ff'; ctx.fillRect(21, -3, 39, 3); ctx.fillStyle = '#9ab0ee'; ctx.fillRect(21, 0, 33, 3); }
+      if (!(p.ax && (p.ax.foldT > 0 || p.ax.sheathT > 0))) { ctx.rotate(off); ctx.fillStyle = '#141013'; ctx.fillRect(3, -6, 60, 9); ctx.fillStyle = '#3a3278'; ctx.fillRect(6, -3, 12, 3); ctx.fillStyle = '#a27ae0'; ctx.fillRect(18, -6, 3, 9); ctx.fillStyle = '#eef4ff'; ctx.fillRect(21, -3, 39, 3); ctx.fillStyle = '#9ab0ee'; ctx.fillRect(21, 0, 33, 3); }
     } else {
       const up = p.castAnim > 0 || p.charge > 0.05 ? -0.5 * (p.face || 1) : 0; ctx.rotate(up);
       const st = skw ? skw.img : weapon('staff'); ctx.drawImage(st, -4, -st.height * WPP / 2, st.width * WPP, st.height * WPP);

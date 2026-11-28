@@ -19,6 +19,7 @@ export function axiomEvent(R, e) {
   else if (e.ev === 'axSwap') fx.push({ type: 'swap', x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, t: 0.45, T: 0.45 });
   else if (e.ev === 'axConfuse') fx.push({ type: 'wave', x: e.x, y: e.y, r: e.r, t: 0.55, T: 0.55 });
   else if (e.ev === 'axShatter') startShatter(R, e);
+  else if (e.ev === 'axSever') { fx.push({ type: 'sever', x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, t: 0.5, T: 0.5 }); R.flashW = Math.max(R.flashW || 0, 0.12); R.addShake(e.hits ? 14 : 6); R.axStopK = 0; }
   else if (e.ev === 'axBlock' || e.ev === 'axCube' || e.ev === 'axClash' || e.ev === 'axMark') fx.push({ type: 'pop', x: e.x, y: e.y - 8, t: 0.3, T: 0.3 });
 }
 
@@ -51,6 +52,9 @@ export function axiomOver(R, c, sim, t, dt) {
     } else if (f.type === 'swap') {
       c.globalAlpha = k; for (const [x, y] of [[f.x1, f.y1], [f.x2, f.y2]]) { const s = 14 + 40 * (1 - k); c.strokeStyle = '#c9a8ff'; c.lineWidth = 4; c.beginPath(); c.rect(sn(x - s), sn(y - 14 - s), s * 2, s * 2); c.rect(sn(x - s * 0.55), sn(y - 14 - s * 0.55), s * 1.1, s * 1.1); c.stroke(); for (let i = 0; i < 4; i++) drawCube(c, x + Math.cos(i * 1.57 + f.t * 12) * s, y - 14 + Math.sin(i * 1.57 + f.t * 12) * s, 0.8 * k + 0.2); }
       seg(c, f, '#9d6aff', 10 * k, 0.5 * k);
+    } else if (f.type === 'sever') {
+      seg(c, f, '#9d6aff', 46 * k, 0.6 * k); seg(c, f, '#ffffff', 12 * k, k);
+      c.globalAlpha = k; for (let i = 1; i <= 7; i++) { const q = i / 8, nx = -(f.y2 - f.y1), ny = f.x2 - f.x1, L = Math.hypot(nx, ny) || 1, off = (1 - k) * (i % 2 ? 60 : -60); drawCube(c, f.x1 + (f.x2 - f.x1) * q + nx / L * off, f.y1 + (f.y2 - f.y1) * q + ny / L * off, 1.2 * k + 0.3); }
     } else if (f.type === 'wave') { c.globalAlpha = 0.8 * k; c.strokeStyle = '#a27ae0'; c.lineWidth = 8; const s = f.r * (1 - k * k); c.beginPath(); c.rect(sn(f.x - s), sn(f.y - s * 0.6), s * 2, s * 1.2); c.stroke();
     } else if (f.type === 'pop') { c.globalAlpha = k; c.strokeStyle = '#c4d4ff'; c.lineWidth = 3; const s = 6 + 22 * (1 - k); c.beginPath(); c.rect(sn(f.x - s), sn(f.y - s), s * 2, s * 2); c.stroke(); }
   }
@@ -93,7 +97,16 @@ function startShatter(R, e) {
   const cracks = []; for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2 + rnd() * 0.3, line = [[ix, iy]]; for (let s = 1; s <= 7; s++) { const r = s / 7 * Math.hypot(W, H) * 0.75, w = (rnd() - 0.5) * 0.28; line.push([ix + Math.cos(a + w) * r, iy + Math.sin(a + w) * r]); } cracks.push(line); }
   R.axShat = { t: 0, shards, cracks };
 }
-export function axiomScreen(R, c, W, H, dt) {
+export function axiomScreen(R, c, W, H, dt, sim) {
+  // Thuấn Trảm: thế giới mất màu, chỉ còn đường đi của Axiom
+  const st = sim && sim.p.ax && sim.p.ax.stop;
+  if (st) R.axStopK = Math.min(1, st.t / AX.STOP.fade); else if (R.axStopK > 0) R.axStopK = Math.max(0, R.axStopK - dt * 6);
+  if (R.axStopK > 0) {
+    const k = R.axStopK; c.save(); c.globalCompositeOperation = 'saturation'; c.globalAlpha = k; c.fillStyle = '#808080'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 0.18 * k; c.fillStyle = '#05040a'; c.fillRect(0, 0, W, H);
+    if (st) { const p = sim.p, [x0, y0] = R.toScreen(st.x0, st.y0), [x1, y1] = R.toScreen(p.x, p.y); c.globalAlpha = 0.9; c.strokeStyle = '#eef4ff'; c.lineWidth = 2; c.setLineDash([10, 8]); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); c.setLineDash([]); }
+    c.restore();
+  }
   const S = R.axShat; if (!S) return;
   S.t += Math.min(dt, 0.05); const t = S.t, snap = R.axSnap;
   if (t >= SH.END) { R.axShat = null; return; }

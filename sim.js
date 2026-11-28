@@ -198,9 +198,10 @@ export class Sim {
   // nhát chém của Knight đỡ đạn quái bay tới phía trước; Mirror Guard (relic) / Reflecting Edge (nâng cấp) bật đạn ngược về kẻ bắn.
   // Reflecting Edge mở rộng góc + tầm đỡ (cấp 2 rộng hơn nữa) để đỡ đòn định hướng dễ hơn.
   parryShot(s) {
-    const p = this.p; if (p.cls !== 'KNIGHT' || !(p.swing > 0.06)) return false;
-    const dl = (p.mods && p.mods.deflect) || 0, R = 70 + dl * 18, A = 0.9 + dl * 0.25;
-    if (dist(s.x, s.y, p.x, p.y) > R || Math.abs(angDiff(Math.atan2(s.y - p.y, s.x - p.x), p.aim)) > A) return false;
+    const p = this.p; if (p.cls !== 'KNIGHT' || !(p.swing > 0)) return false;
+    // vùng đỡ = vệt chém đang hiện (tầm + góc của nhát chém), Reflecting Edge nới thêm
+    const dl = (p.mods && p.mods.deflect) || 0, S = p.slashRef || { reach: 70, arc: 1.8, a: p.aim }, R = Math.max(70, S.reach + 14) + dl * 18, A = Math.max(0.9, S.arc / 2 + 0.15) + dl * 0.25;
+    if (dist(s.x, s.y, p.x, p.y) > R + (s.r || 6) || Math.abs(angDiff(Math.atan2(s.y - p.y, s.x - p.x), S.a)) > A) return false;
     s.life = 0; this.emit('parry', { x: s.x, y: s.y });
     const m = p.mods || {}, mul = Math.max(m.riposte ? 1.5 : 0, dl >= 2 ? 1.6 : dl ? 1.0 : 0); if (mul > 0) this.reflectShot(s, mul);
     return true;
@@ -252,7 +253,8 @@ export class Sim {
       if (hits && this.gainEnergy) this.gainEnergy(c > 0 ? 0.75 + 2.25 * c : big ? 0.75 : 0.4);
       if (hits && c === 0 && M.rhythm) p.chargePre = M.rhythm;
       if (hits && this.t - (p.swingHealT ?? -9) >= 0.5) { p.swingHealT = this.t; p.hp = Math.min(p.max, p.hp + 1); }   // Knight: đòn thường trúng hồi 1 máu (tối đa 2/s) // năng lượng theo nhát chém, không nhân theo số quái
-      this.emit('swing', { x: p.x, y: p.y, a: p.aim, big, combo: p.combo, hits, reach, arc, charge: c });
+      p.slashRef = { reach, arc, a: p.aim };   // vùng đỡ đạn = đúng vệt chém nhìn thấy
+      this.emit('swing', { x: p.x, y: p.y, a: p.aim, big, combo: p.combo, hits, reach, arc, charge: c, dir: p.swingDir });
       if (hits) this.hitstop = Math.max(this.hitstop, big ? 0.075 : 0.04);
     } else if (p.cls === 'RANGER') {
       const extra = M.atkExtra || 0, ric = M.ricochet || 0;

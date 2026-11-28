@@ -1,6 +1,6 @@
 // Lõi một lượt chơi: 20 stage, boss ở 5/10/15/20, nâng cấp sau mỗi wave, nâng cấp lớn ở đầu stage 3/7/12/18.
 // Mỗi ô trên thanh là một lõi (chiêu đã ghép sẵn): bấm 1 phím là tung. Ghép lõi trong túi đồ.
-import { mirrorDodge, mirrorBreak, confusedStep } from './axiom.js';
+import { mirrorDodge, mirrorBreak, confusedStep, axiomStop } from './axiom.js';
 import { Sim, ENEMIES, CLASSES, dist, angDiff } from './sim.js';
 import { EL, skillDef, coreDef, coreKey, coreEls, mergeResult, skillPower } from './kits.js';
 import { defaultMods, rollMinor, rollMajor, MINOR_BY_ID } from './upgrades.js';
@@ -236,6 +236,7 @@ export class Game extends Sim {
     if (it.ax !== undefined) this.aim = [it.ax, it.ay];
     if (this.over || this.state !== 'fight') return;
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
+    if (this.p.ax && this.p.ax.stop && axiomStop(this, dt)) return;   // Thuấn Trảm: thế giới đứng yên, đồng hồ không chạy
     if (this.deathSlow > 0) { this.deathSlow -= dt; dt *= 0.3; }   // boss gục: chậm lại một nhịp
     let it2 = { ...it, dash: this.dashQ, space: !!this.spaceQ }; this.dashQ = false; this.spaceQ = false; frozenInput(this, it2);
     if (this.travel > 0) { const G = this.portal; it2 = G ? { mx: G.x - this.p.x, my: G.y - 30 - this.p.y, ax: G.x, ay: G.y - 60 } : {}; this.inQ = []; this.p.queued = null; }   // đang bước qua cổng
@@ -719,7 +720,7 @@ export class Game extends Sim {
   // ---------- stage ----------
   startStage(n) {
     const p = this.p;
-    this.stage = n; this.state = 'fight'; this.stageT = 0; this.spawnQ = []; this.sigils = []; this.burstT = 0.8;
+    this.stage = n; this.state = 'fight'; this.stageT = 0; this.forgeHold = false; this.spawnQ = []; this.sigils = []; this.burstT = 0.8;
     this.clearT = 0; this.waveN = 0; this.waveOf = 0; this.waveRest = 0; this.loot = null; this.portal = null; this.travel = 0; this.deathSlow = 0; this.vacuum = false;
     setTheme(this, this.labTheme || themeForStage(n));
     this.inQ = []; p.queued = null;
@@ -756,7 +757,7 @@ export class Game extends Sim {
     this.stageT += dt;
     if (this.boss) { if (this.boss.dead) this.bossVictory(dt); return; }
     this.tickSigils(dt);
-    if (this.clearT > 0) { this.clearT -= dt; if (this.clearT <= 0) { this.clearT = 0; this.clearStage(); } return; }   // nghỉ sau stage: đồ tự bay về, rồi màn tối dần
+    if (this.clearT > 0) { this.clearT -= dt; if (this.clearT <= 0) { this.clearT = 0; this.forgeHold = false; this.clearStage(); } return; }   // nghỉ sau stage: đồ tự bay về, rồi màn tối dần
     const alive = this.enemies.filter(e => e.type !== 'DUMMY').length + this.sigils.length;
     this.burstT -= dt;
     if (this.spawnQ.length) {
@@ -765,6 +766,8 @@ export class Game extends Sim {
       else if (this.burstT <= 0 || this.waveN === 0) this.nextWave();   // wave đầu ra ngay khi vào stage
       return;
     }
+    if (alive === 0 && this.forge && this.holdForge && !this.forgeHold) { this.forgeHold = true; this.foes = []; this.emit('forgeHold', { n: this.stage, name: smithOf(this.forge.theme).name }); return; }   // còn thợ rèn: chờ người chơi mua xong rồi tự bấm qua
+    if (alive === 0 && this.forgeHold) return;
     if (alive === 0) { this.clearT = STAGE_REST; this.foes = []; this.emit('stageCleared', { n: this.stage }); }
   }
   nextWave() {
@@ -848,6 +851,8 @@ export class Game extends Sim {
     this.rewards = [{ type: 'minor', choices: rollMinor(this) }];
     if (MAJOR_STAGES.includes(this.stage + 1)) this.rewards.push({ type: 'major', choices: rollMajor(this) });
   }
+  // người chơi bấm Next stage khi đang chờ ở stage có thợ rèn
+  proceed() { if (!this.forgeHold || this.clearT > 0) return false; this.forgeHold = false; this.clearT = STAGE_REST; this.emit('stageCleared', { n: this.stage }); return true; }
   rerollCost() { return this.rerolls > 0 ? 0 : [5, 8, 12, 16, 20][Math.min(4, this.paidRerolls)]; }
   // tung lại 3 thẻ của màn thưởng hiện tại (main lo trừ lượt miễn phí / gem)
   rerollReward(paid) { const r = this.rewards[0]; if (!r) return false; if (paid) this.paidRerolls++; else if (this.rerolls > 0) this.rerolls--; else return false; r.choices = r.type === 'minor' ? rollMinor(this) : rollMajor(this); this.emit('reroll', {}); return true; }

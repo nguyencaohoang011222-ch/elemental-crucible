@@ -46,7 +46,7 @@ export function axiomPose(p, t, moving, P) {
     P.by = [1, 1, 0, 1, 1, 1, 0, 1][f]; P.lean = 1; P.alx = -2; P.aly = 1; P.arx = -1; P.hair = [2, 2, 3, 3, 2, 2, 3, 3][f];
   } else { const f = Math.floor(t / 0.28) % 4; P.by = f >= 2 ? 1 : 0; P.hair = [0, 0, 1, 1][f]; P.hd = 0; P.arx = -1; if (t % 3.4 < 0.14) P.eyes = 'closed'; }
   const A = p.ax;
-  if (A && A.foldT > 0) Object.assign(P, { arx: -4, ary: 1, alx: 1, lean: 0, by: 1, hd: 1, eyes: 'closed', hair: 1 });   // tra kiếm
+  if (A && (A.foldT > 0 || A.sheathT > 0)) Object.assign(P, { arx: -4, ary: 1, alx: 1, lean: 0, by: 1, hd: 1, eyes: 'closed', hair: 1 });   // tra kiếm
   else if ((p.charge || 0) > 0.05) { Object.assign(P, { lean: moving ? 1 : -1, by: 1, arx: -3, ary: 1, alx: -1 }); if (!moving) { P.lx = -2; P.rx = 2; } }
   else if (p.swing > 0) { Object.assign(P, { lean: 1, arx: 2, ary: (p.combo === 2 ? -2 : 0), hair: 3 }); if (!moving) { P.lx = -2; P.rx = 2; P.by = 1; } }
   if (p.hurtT > 0) { P.lean = -1; P.eyes = 'hurt'; }

@@ -35,14 +35,15 @@ const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
 
 // ---------- cài đặt (lưu trên máy) ----------
-const SET = { gfx: 'auto', master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake: true, numbers: true, hints: true, autopause: true, control: 'wasd', fps: false, light: true };
+const SET = { gfx: 'auto', master: 70, sfx: 90, music: 55, musicOn: true, sfxOn: true, shake: true, numbers: true, hints: true, autopause: true, control: 'wasd', fps: false, light: true, zoom: 100 };
 { let saved = {}; try { saved = JSON.parse(localStorage.getItem('ea-settings') || '{}'); } catch (e) { /* trình duyệt chặn lưu trữ */ } Object.assign(SET, saved); if (!saved.control && matchMedia('(pointer: coarse)').matches) SET.control = 'touch'; }   // máy cảm ứng: lần đầu tự chọn điều khiển Touch
 function saveSet() { try { localStorage.setItem('ea-settings', JSON.stringify(SET)); } catch (e) { /* bỏ qua */ } R.opts.shake = SET.shake; R.opts.numbers = SET.numbers; R.opts.fps = SET.fps; R.opts.light = SET.light; applyGfx(); AU.setVolumes(SET.master / 100, SET.sfx / 100, SET.music / 100); AU.setMusicOn(SET.musicOn); AU.setSfxOn(SET.sfxOn); }
 saveSet();
 // camera khoá tầm nhìn: luôn thấy đúng VIEW_ROWS pixel game theo chiều dọc (≈800 đơn vị thế giới ≈ 16.7 ô), bất kể cỡ cửa sổ / toàn màn hình / devicePixelRatio.
 // canvas vẽ ở độ phân giải VIEW_ROWS×P (P nguyên → pixel đều), CSS kéo giãn cho vừa cửa sổ; chiều ngang theo tỉ lệ màn hình.
 const VIEW_ROWS = 267;
-function fit() { const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight), P = Math.max(2, Math.round(h / VIEW_ROWS)), H = VIEW_ROWS * P; R.fixedP = P; R.resize(Math.round(w * H / h), H); }
+const ZOOMS = [90, 100, 115, 130, 150];   // % phóng to do người chơi chọn (Settings): ít hàng pixel hơn = nhìn to hơn
+function fit() { const rows = Math.round(VIEW_ROWS * 100 / Math.max(80, Math.min(160, SET.zoom || 100))), w = Math.max(1, innerWidth), h = Math.max(1, innerHeight), P = Math.max(2, Math.round(h / rows)), H = rows * P; R.fixedP = P; R.resize(Math.round(w * H / h), H); }
 addEventListener('resize', fit); fit();
 
 // ---------- âm thanh: xem audio.js (hiệu ứng 8-bit + nhạc chiptune) ----------
@@ -69,7 +70,7 @@ addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensure
 function startRun(cfg) {
   ensureAudio(); runCfg = { ...cfg }; isTraining = false; PR.clearRun();
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { element: cfg.element, difficulty: cfg.difficulty, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
-  hookRunSave(game); enterPlay();
+  game.holdForge = true; hookRunSave(game); enterPlay();
 }
 // ---------- lưu tiến trình lượt chơi: tự lưu mỗi khi qua stage, tắt tab mở lại vẫn Continue được ----------
 function hookRunSave(g) { g.onStageSave = n => { if (g !== game || isTraining || g.lab) return; PR.saveRun(snapshotRun(g, n)); pushNow(); }; }
@@ -79,7 +80,7 @@ function continueRun() {
   ensureAudio(); isTraining = false; runCfg = { ...runCfg, cls: s.cls, difficulty: s.difficulty || 'NORMAL' };
   try { game = restoreRun(s, { skin: PR.skinOf(s.cls), skinFx: PR.skinFx(s.cls, PR.skinOf(s.cls)) }); }
   catch (e) { console.warn('runsave: không khôi phục được', e); PR.clearRun(); renderContinue(); showHint('Your saved run could not be loaded.', 4); return; }
-  hookRunSave(game); enterPlay(); showHint('Run restored: stage ' + s.stage + '.', 3);
+  game.holdForge = true; hookRunSave(game); enterPlay(); showHint('Run restored: stage ' + s.stage + '.', 3);
 }
 function renderContinue() {
   const s = savedRun(), b = $('contbtn'), nb = document.querySelector('.tbtn[data-act="newrun"]'); if (!b) return;
@@ -99,7 +100,7 @@ function startLab(cfg) {
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { training: true, lab: true, theme: cfg.theme, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
   Object.assign(game, keep);
   enterPlay(); showLab(true);
-  if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge as the square closes to cut; ' + (TM.touchOn() ? 'tap the cube button' : 'tap Shift') + ' to fold. Hold it on a foe to swap places, on yourself to confuse them. A full purple bar cheats one death.', 12);
+  if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge as the square closes to cut; ' + (TM.touchOn() ? 'tap the cube button' : 'tap Shift') + ' to fold. Hold it on a foe to swap places, on yourself to confuse them. Release a full charge late to rush; keep holding to stop time. A full purple bar cheats one death.', 12);
 }
 initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
 // dải chiêu Test Lab: kéo thẳng lên ô nào trên thanh chiêu thì thay ô đó
@@ -122,6 +123,7 @@ function trackEvents(evs) {
     else if (e.ev === 'hurt' && game.boss) game.noHitBoss = false;
     else if (e.ev === 'bossDown') { const bid = game.boss ? game.boss.def.id : e.name, n = PR.bossDefeated(bid); game.bossLoot('gem', Math.max(1, Math.min(5, n)), '+' + n + ' gems', ''); const sh = PR.rollBossShard(bid); if (sh) { game.bossLoot('bshard', 1, 'BOSS SHARD', sh.unlocked ? 'BOSS SKIN UNLOCKED: ' + sh.name + ' (' + CLASSES[sh.cls].name + ')!' : CLASSES[sh.cls].name + ' shard: ' + sh.name + ' ' + sh.count + '/' + sh.need); R.rings.push({ x: e.x, y: e.y, r: 10, R: 160, t: 0.8, T: 0.8, c: '#5af0c0', w: 6 }); } if (game.noHitBoss) PR.track('nohit'); }
     else if (e.ev === 'stageClear') PR.track('stages');
+    else if (e.ev === 'forgeHold') showHint('Stage clear. Shop at ' + e.name + ' as long as you like, then press ' + (TM.touchOn() ? 'Next stage' : 'Enter or Next stage') + '.', 8);
     else if (e.ev === 'pickup' && e.hint) showHint(e.hint, 5);
     else if (e.ev === 'bombBlast') PR.track('bombs');
     else if (e.ev === 'obstacleBreak' && e.type === 'crystal') PR.track('crystals');
@@ -524,6 +526,7 @@ function renderGuide(rows) {
       + sec('coin', 'Gold, smiths and relics', '<p>Enemies drop <b>gold</b>. Sometimes a <b>smith</b> camps nearby: buy stat boosts, forge (upgrade) a skill, or take one <b>Cursed Relic</b>. Relics are strong but always come with a price.</p>')
       + sec('gem', 'After a run', '<p>Win or lose, you earn <b>gems</b>. Spend them in <b>Shop &amp; Skins</b>. Daily Quests give extra gems.</p>'),
     controls: keys,
+    get axiom() { return axGuide(); },
     merge: sec('sparkle', 'What is merging?', '<p>Each <b>core</b> is one element: Fire, Water, Earth or Wind. Open the <b>Bag</b> (<kbd>Tab</kbd>), click cores to put them on the merge table, then press <b>Merge</b>. A merged skill is stronger than its parts and does more.</p><p>The examples below use your hero, <b>' + CN + '</b>.</p>')
       + sec('flame', 'Recipes', '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('→') + res('Two-element skill' + (duo ? ': ' + duo.name : ''), duo) + '<span class="gnote">2 single cores of <b>different</b> elements. Order matters: the first core sets the main effect.</span></div>'
         + '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('+') + el('EARTH') + OP('→') + res('Ultimate' + (tri ? ': ' + tri.name : ''), tri) + '<span class="gnote">3 single cores, all different. Costs <b>1 Fusion Shard</b> ◆ (break purple crystals or defeat elites).</span></div>'
@@ -533,13 +536,34 @@ function renderGuide(rows) {
     tips: sec('heart', 'Staying alive', '<ul><li><kbd>Space</kbd> dash makes you <b>invincible</b>: dash through boss attacks and shockwaves.</li><li>Coloured marks on the ground show where an attack will land. Step out of them.</li><li>Potions heal. The smith sells more.</li></ul>')
       + sec('star', 'Getting stronger', '<ul><li>Merge early: one merged skill beats two single ones.</li><li>Hold left-click to <b>charge</b> your basic attack for big hits.</li><li>Read a relic\'s price before you buy it. Open the Bag any time to check your build.</li></ul>')
   };
+  // tab riêng cho Axiom (chỉ khi đang cầm Axiom trong Test Lab): PC và điện thoại dùng chung một bảng, mỗi cột ghi cách bấm của từng máy
+  const AX_KEYS = [
+    ['Tap left-click / Tap the big button', 'Basic attack, 3-hit chain. The 3rd hit grants a cube.', 'Tap the big button'],
+    ['Hold left-click, release late', 'Charge. Release while the square is closing: a cut stays on the ground.', 'Hold the big button, release as the square closes'],
+    ['Release a full charge late (after the square)', 'Rapid Slash: lunges forward and spins two cuts along the way.', 'Same: hold, release a little late'],
+    ['Hold a full charge 1 s more', 'Flash Cut: time stops, the screen goes black and white, you walk through, slash once, sheath, then the cut lands.', 'Same: keep holding after full'],
+    ['Shift (tap)', 'Fold: all cuts detonate after a short beat. 4 cuts together hit harder.', 'Cube button (tap)'],
+    ['Shift (hold, aim at a foe, release)', 'Swap places: you take its spot and the foe takes yours. Cost 30 Illusion.', 'Hold cube button, drag onto a foe, release'],
+    ['Shift (hold, sweep 2 foes)', 'Swap those two foes. Cost 40 Illusion.', 'Hold, drag across two foes, release'],
+    ['Shift (hold, aim at yourself)', 'Confusion: foes near you turn on each other for 3 s. Cost 50 Illusion.', 'Hold, drag back into the middle of the button, release'],
+    ['Dash (Space / Dash button) as a shot arrives', 'Mirror dodge: leaves a decoy that pulls enemies, +25 Illusion, +1 cube.', 'Dash button at the last moment'],
+    ['Taking a lethal hit with a full purple bar', 'Mirror Break: the hit was a lie. You return at 35% HP, the attacker takes your place. Once per stage.', 'Same, automatic']
+  ];
+  const axGuide = () => {
+    const touch = TM.touchOn();
+    const rows = AX_KEYS.map(([pc, what, ph]) => '<tr><td>' + (touch ? ph : pc) + '</td><td>' + what + '</td></tr>').join('');
+    return '<table class="keys" style="width:100%">' + rows + '</table>'
+      + '<p class="sub">Purple bar under your feet: Illusion. Cubes orbit you and block shots.</p>';
+  };
   const TABS = [['basics', 'Basics'], ['controls', 'Controls'], ['merge', 'Merging'], ['tips', 'Tips']];
+  if (isAxiomRun()) TABS.push(['axiom', 'Axiom']);
   if (!T[guideTab]) guideTab = 'basics';
   $('guidetabs').innerHTML = TABS.map(([k, n]) => '<button data-g="' + k + '" class="' + (k === guideTab ? 'on' : '') + '">' + n + '</button>').join('');
   for (const b of $('guidetabs').children) b.onclick = () => { guideTab = b.dataset.g; renderControls(); };
   $('guidebody').innerHTML = T[guideTab]; $('guidebody').scrollTop = 0;
 }
 let guideTab = 'basics';
+const isAxiomRun = () => !!(game && game.p && game.p.cls === 'AXIOM');
 
 // ---------- tạo lượt mới ----------
 let nrStep = 1, nrCls = runCfg.cls, nrEl = runCfg.element, nrDiff = runCfg.difficulty;
@@ -603,7 +627,7 @@ $('nrback').onclick = () => { if (nrStep === 2) { nrStep = 1; renderNewRun(); } 
 // ---------- cài đặt ----------
 function openSettings() {
   $('s-master').value = SET.master; $('s-sfx').value = SET.sfx; $('s-music').value = SET.music; $('s-musicon').checked = SET.musicOn; $('s-sfxon').checked = SET.sfxOn; $('s-shake').checked = SET.shake; $('s-numbers').checked = SET.numbers; $('s-hints').checked = SET.hints; $('s-autopause').checked = SET.autopause; $('s-fps').checked = SET.fps; $('s-light').checked = SET.light; syncGfx();
-  syncControl(); openModal('settings');
+  syncControl(); syncZoom(); openModal('settings');
 }
 $('s-master').oninput = e => { SET.master = +e.target.value; saveSet(); };
 $('s-sfx').oninput = e => { SET.sfx = +e.target.value; saveSet(); ensureAudio(); tone(440, 0.08, 'triangle', 0.05); };
@@ -617,6 +641,8 @@ $('s-autopause').onchange = e => { SET.autopause = e.target.checked; saveSet(); 
 $('s-fps').onchange = e => { SET.fps = e.target.checked; saveSet(); };
 $('s-light').onchange = e => { SET.light = e.target.checked; saveSet(); };
 for (const b of $('gfxseg').children) b.onclick = () => { SET.gfx = b.dataset.q; autoLow = false; saveSet(); syncGfx(); };
+for (const b of $('zoomseg').children) b.onclick = () => { SET.zoom = +b.dataset.z; saveSet(); syncZoom(); fit(); };
+function syncZoom() { for (const b of $('zoomseg').children) b.classList.toggle('on', +b.dataset.z === (SET.zoom || 100)); }
 function syncGfx() { for (const b of $('gfxseg').children) b.classList.toggle('on', b.dataset.q === SET.gfx); }
 
 // ---------- thưởng sau wave ----------
@@ -834,6 +860,7 @@ function renderSmith() {
 }
 $('smithclose').onclick = () => closeSmith();
 $('tradep').onclick = () => openSmith();
+$('nextstage').onclick = e => { e.stopPropagation(); if (ui === 'play' && game.proceed) game.proceed(); };
 
 // ---------- input ----------
 addEventListener('keydown', e => {
@@ -865,6 +892,7 @@ addEventListener('keydown', e => {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') spaceQ = true;   // Axiom: Gập
   if (e.code === 'Digit1') potQ = 'hp'; if (e.code === 'Digit2') potQ = 'en';
   if (e.code === 'KeyT') openSmith();
+  if (e.code === 'Enter' && game.forgeHold) game.proceed();
   if (e.code === 'Tab' || e.code === 'KeyI') openBag();
   if (e.code === 'Escape') pause();
   if (e.code === 'KeyP') pause();
@@ -932,6 +960,7 @@ function hud(dt) {
   { const sh = game.labShards ? '∞' : String(p.shards || 0); if ($('shards').textContent !== sh) $('shards').textContent = sh; }
   { const gv = String(p.gold || 0), gb = $('goldv'); if (gb.textContent !== gv) { gb.textContent = gv; const box = $('goldbox'); box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); } }
   for (const [k, id] of [['hp', 'poth'], ['en', 'pote']]) { const n = (p.potions || {})[k] || 0, el = $(id); $(id + 'n').textContent = n; el.classList.toggle('empty', !n); el.classList.toggle('cd', p.potCd > 0); }
+  { const nb = $('nextstage'), on = !!(g.forgeHold && g.clearT <= 0 && g.state === 'fight' && !isTraining); nb.classList.toggle('hidden', !on); }
   { const tp = $('tradep'), on = !!(g.inForge && g.forge && g.state === 'fight'); tp.classList.toggle('hidden', !on); if (on) { const nm = FG.smithOf(g.forge.theme).name; if ($('tradename').textContent !== nm) $('tradename').textContent = nm; } }
   $('en').style.width = Math.max(0, p.energy / p.energyMax * 100) + '%'; $('ent').textContent = Math.floor(p.energy) + ' / ' + p.energyMax;
   const bsig = SET.control + p.cores.slice(0, BAR_SIZE).map(c => c ? JSON.stringify(c) : '-').join('|');

@@ -6,7 +6,7 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 
 - **1× native texel density.** Every sprite is authored on a 1× pixel grid (`Grid` in `gfx/pixel.js`) and drawn at `WPP` (3) world px per texel with `imageSmoothingEnabled = false`. Never mix sprites at different texel sizes in the same scene; never smooth-scale pixel art.
 - **Outlines:** 1 px dark outline on characters (`#141013` for the player, `#09080f`/`#0c0a12` elsewhere).
-- **Camera:** fixed vertical field of view (`VIEW_ROWS` in `main.js`, about 801 world units). Do not tie zoom to window size or `devicePixelRatio`.
+- **Camera:** fixed vertical field of view (`VIEW_ROWS` in `main.js`, about 801 world units). Do not tie zoom to window size or `devicePixelRatio`. The only exception is the player's own Zoom setting (`SET.zoom`, 90–150%), which `fit()` applies.
 
 ## Player sprites: chibi standard
 
@@ -51,5 +51,5 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 ## Axiom (experimental hero, Test Lab only)
 
 - `CLASSES.AXIOM.lab` hides it from New Run. Combat logic is in `axiom.js`, sprite and poses in `gfx/axiomrig.js`, effects in `gfx/axiomfx.js`; test `tests/axiom.mjs`.
-- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes, Illusion bar with hold-to-swap, double swap, confusion (`confusedStep` replaces enemy AI) and the Mirror Break death cheat with a screen shatter (one snapshot per use). Element skills temporarily reuse the Knight kit.
+- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes, Rapid Slash (late full release rushes with two spin cuts), Flash Cut (hold a full charge 1 s: `axiomStop` freezes the world and clock, desaturated screen, walk, slash, sheath, then damage), Illusion bar with hold-to-swap, double swap, confusion (`confusedStep` replaces enemy AI) and the Mirror Break death cheat with a screen shatter (one snapshot per use). Element skills temporarily reuse the Knight kit.
 - Not done yet: style rank, the two cube ultimates, own 16 skills, portrait / diorama / skins, run save of `p.ax`.

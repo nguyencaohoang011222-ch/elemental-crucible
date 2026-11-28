@@ -378,7 +378,7 @@ export function skinEvent(R, e, th, cat, cls, sim) {
   }
   if (cat === 'basic') {
     if (e.ev === 'swing') {
-      const range = e.reach || 104, arc = e.arc || 1.4, dir = e.combo % 2 ? 1 : -1;
+      const range = e.reach || 104, arc = e.arc || 1.4, dir = e.dir || (e.combo % 2 ? 1 : -1);
       add('crescent', { x: e.x, y: e.y, a: e.a, range, arc, dir, big: e.charge > 0.3 || e.big, style: S.slash || 'smooth', T: e.charge ? 0.34 : 0.24 });
       for (let i = 0; i < 6; i++) { const q = e.a + (i / 5 - 0.5) * arc; motif(R, th, e.x + Math.cos(q) * range, e.y + Math.sin(q) * range, 1, 4, 'spark'); }
       if (e.charge > 0.6) glyph(R, th, e.x + Math.cos(e.a) * range * 0.6, e.y + Math.sin(e.a) * range * 0.6, Math.min(70, range * 0.5), 0.4);

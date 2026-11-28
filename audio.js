@@ -93,6 +93,11 @@ const R = {
   axClash: () => { const t = now(); osc('square', 700, t, 0.05, 0.04, { to: 350 }); },
   // Gương Vỡ: im lặng, kính rạn dần, vỡ lớn, rồi "cạch"
   axShatter: () => { const t = now(); osc('sine', 70, t, 0.3, 0.14, { to: 35 }); [0.36, 0.46, 0.55, 0.62, 0.68, 0.73].forEach((d, i) => nz(t + d, 0.04, 0.05 + i * 0.012, { type: 'highpass', f: 3500 + i * 500 })); nz(t + 0.8, 0.55, 0.16, { type: 'highpass', f: 2200 }); boom(t + 0.8, 1.4); [2093, 1760, 2637, 1397].forEach((f, i) => osc('triangle', f, t + 0.82 + i * 0.05, 0.3, 0.035)); osc('square', 900, t + 1.35, 0.05, 0.07, { to: 300 }); },
+  axRush: () => { const t = now(); nz(t, 0.22, 0.09, { type: 'bandpass', f: 900, to: 4200, q: 1.4 }); osc('sawtooth', 220, t, 0.18, 0.04, { to: 660 }); },
+  // Thuấn Trảm: mọi thứ hút ngược vào im lặng, tiếng chuông xa; nhát chém sắc; "cạch" rồi đòn mới nổ
+  axStop: () => { const t = now(); osc('sine', 1200, t, 0.35, 0.07, { to: 80 }); nz(t, 0.3, 0.06, { type: 'bandpass', f: 3000, to: 300 }); osc('triangle', 2637, t + 0.32, 1.4, 0.025, { vib: 4, vibF: 5 }); },
+  axSlash: () => { const t = now(); nz(t, 0.09, 0.12, { type: 'highpass', f: 5000 }); osc('square', 3000, t, 0.06, 0.03, { to: 1200 }); },
+  axSever: e => { const t = now(); nz(t, 0.4, 0.15, { type: 'highpass', f: 1800 }); boom(t, e.hits ? 1.5 : 0.8); osc('sawtooth', 110, t, 0.5, 0.06, { to: 40 }); },
   axBlock: () => { const t = now(); osc('square', 1200, t, 0.07, 0.04, { to: 600 }); },
   axCube: () => { const t = now(); osc('triangle', 1175, t, 0.09, 0.04, { to: 1760 }); },
   parry: () => { const t = now(); osc('square', 1600, t, 0.1, 0.05, { to: 2200 }); osc('triangle', 2400, t, 0.18, 0.03); },

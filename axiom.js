@@ -4,6 +4,9 @@ export const AX = { CUBES: 8, START: 3, WINDOW: 0.2, PLANE_LEN: 270, PLANE_MAX: 
   // Ảo: tài nguyên cho các chiêu thực tại giả
   ILL: 100, ILL_DODGE: 25, ILL_CUT: 12, ILL_FOLD: 6, ILL_HIT: 2, LAB_REGEN: 8,
   HOLD: 0.22, HOLD_SLOW: 0.8, SWAP: 30, SWAP2: 40, CONFUSE: 50, CONFUSE_R: 260, CONFUSE_T: 3,
+  // Rapid Slash: nhả tụ đầy thì lao đi chém xoay; Thuấn Trảm: giữ tụ đầy thêm STOP_HOLD giây thì dừng thời gian
+  RUSH_T: 0.3, RUSH_HITS: [0.1, 0.22], RUSH_R: 86, RUSH_DMG: 24, STOP_HOLD: 1.0, STOP_LEN: 300, STOP_W: 46, SEVER: 105,
+  STOP: { fade: 0.3, walk: 1.5, slash: 1.62, sheath: 1.78, end: 2.15 },
   MIRROR_HP: 0.35, MIRROR_BOSS: 0.08, MIRROR_STOP: 1.1, MIRROR_LAB_CD: 20 };
 
 const hyp = Math.hypot;
@@ -49,7 +52,11 @@ export function axiomTick(g, dt, it) {
   const p = g.p, A = axState(p);
   if (!A.init) { A.init = true; if (g.lab) A.illusion = AX.ILL; }
   if (g.lab) gain(A, AX.LAB_REGEN * dt);
-  A.dodgeT = Math.max(0, A.dodgeT - dt); A.blockCd = Math.max(0, A.blockCd - dt);
+  A.dodgeT = Math.max(0, A.dodgeT - dt);
+  if (A.needRelease && !it.fireHeld && p.charge === 0) A.needRelease = false;
+  if (A.needRelease && it.fireHeld) p.charge = 0;   // vừa Thuấn Trảm xong: phải thả nút mới tụ lại
+  if (A.rush) rushTick(g, dt);
+  if (p.charge >= 1 && it.fireHeld && A.fullT >= AX.STOP_HOLD) { startStop(g); return; } A.blockCd = Math.max(0, A.blockCd - dt);
   // thời gian đã giữ ở mức tụ đầy: nhả trong WINDOW giây là đúng nhịp
   if (p.charge >= 1) { if (it.fireHeld) { const was = A.fullT; A.fullT += dt; if (was === 0) g.emit('axReady', { x: p.x, y: p.y }); } } else A.fullT = 0;
   for (const w of A.planes) w.t -= dt;
@@ -79,6 +86,7 @@ function fold(g) {
 // đòn đánh: c = 0 là chuỗi 3 đòn, c > 0 là đòn tụ
 export function axiomAttack(g, c) {
   const p = g.p, A = axState(p), M = p.mods || {}, bm = p.basicMul || 1, as = p.atkSpeed || 1, sz = M.atkSize || 1;
+  if (A.needRelease) { A.needRelease = false; return; }
   const perfect = c >= 1 && A.fullT <= AX.WINDOW; A.fullT = 0;
   let reach, arc, dmg, kb, big = false;
   if (c === 0) {
@@ -108,6 +116,7 @@ export function axiomAttack(g, c) {
   }
   g.damageObs(p.x + Math.cos(p.aim) * reach * 0.6, p.y + Math.sin(p.aim) * reach * 0.6, reach * 0.5, dmg);
   if (hits) { gain(A, AX.ILL_HIT); g.hitstop = Math.max(g.hitstop, big ? 0.06 : 0.035); if (g.gainEnergy) g.gainEnergy(c > 0 ? 0.75 + 2 * c : big ? 0.75 : 0.4); }
+  if (c >= 0.95) startRush(g);
   if (hits && c === 0 && big && A.cubes < AX.CUBES) { A.cubes++; g.emit('axCube', { x: p.x, y: p.y }); }
   g.emit('swing', { x: p.x, y: p.y, a: p.aim, big, combo: p.combo, hits, reach, arc, charge: c });
 }
@@ -191,4 +200,47 @@ export function mirrorBreak(g, a) {
   }
   g.hitstop = Math.max(g.hitstop, AX.MIRROR_STOP);
   g.emit('axShatter', { x, y }); return true;
+}
+
+// ---------- Rapid Slash: lao tới, chém xoay hai vòng trên đường lao ----------
+function startRush(g) {
+  const p = g.p, A = axState(p);
+  A.rush = { t: 0, n: 0 }; p.dashT = AX.RUSH_T; p.dashX = Math.cos(p.aim); p.dashY = Math.sin(p.aim); p.inv = Math.max(p.inv, AX.RUSH_T + 0.06);
+  g.emit('axRush', { x: p.x, y: p.y, a: p.aim });
+}
+function rushTick(g, dt) {
+  const p = g.p, A = axState(p), R = A.rush; R.t += dt;
+  while (R.n < AX.RUSH_HITS.length && R.t >= AX.RUSH_HITS[R.n]) {
+    R.n++; let hits = 0;
+    for (const e of g.enemies) { if (e.dead || hyp(e.x - p.x, e.y - p.y) > AX.RUSH_R + e.r) continue; g.hurtEnemy(e, AX.RUSH_DMG * (p.basicMul || 1), Math.atan2(e.y - p.y, e.x - p.x), 160, 'slash'); hits++; }
+    if (hits) { gain(A, AX.ILL_HIT); g.hitstop = Math.max(g.hitstop, 0.03); }
+    g.emit('swing', { x: p.x, y: p.y, a: p.aim + R.n * 2.1, big: true, combo: 3, hits, reach: AX.RUSH_R, arc: 6.28, charge: 0.5 });
+  }
+  if (R.t >= AX.RUSH_T) A.rush = null;
+}
+// ---------- Thuấn Trảm: thế giới dừng và mất màu, Axiom đi bộ xuyên qua, chém một nhát, tra kiếm, rồi mọi thứ trên đường đi mới nhận đòn ----------
+function startStop(g) {
+  const p = g.p, A = axState(p);
+  A.stop = { t: 0, x0: p.x, y0: p.y, a: p.aim }; A.fullT = 0; A.rush = null; A.press = null; p.charge = 0; p.dashT = 0; p.vx = p.vy = 0;
+  g.emit('axStop', { x: p.x, y: p.y, a: p.aim });
+}
+// gọi từ Game.step thay cho cả lượt cập nhật: đồng hồ trận đứng yên
+export function axiomStop(g, dt) {
+  const p = g.p, A = axState(p), S = A.stop, T = AX.STOP; S.t += dt;
+  p.inv = Math.max(p.inv, 0.6); p.swing = Math.max(0, p.swing - dt); A.sheathT = Math.max(0, (A.sheathT || 0) - dt);
+  const dx = Math.cos(S.a), dy = Math.sin(S.a);
+  if (S.t > T.fade && S.t < T.walk) {
+    const k = (S.t - T.fade) / (T.walk - T.fade), x0 = p.x, y0 = p.y;
+    p.x = S.x0 + dx * AX.STOP_LEN * k; p.y = S.y0 + dy * AX.STOP_LEN * k; if (g.world) g.world.collide(p, p.r); if (g.arena) g.clampArena(p, p.r);
+    p.vx = (p.x - x0) / dt; p.vy = (p.y - y0) / dt; p.face = dx < 0 ? -1 : 1; p.aim = S.a;
+  } else { p.vx = p.vy = 0; }
+  if (S.t >= T.walk && !S.cut) { S.cut = true; p.swing = 0.15; p.combo = 1; p.swingDir = -p.swingDir || 1; g.emit('swing', { x: p.x, y: p.y, a: S.a, big: true, combo: 3, hits: 0, reach: 130, arc: 2.4, charge: 1 }); g.emit('axSlash', { x: p.x, y: p.y }); }
+  if (S.t >= T.slash && !S.sheathed) { S.sheathed = true; A.sheathT = T.end - T.slash; g.emit('axSheath', { x: p.x, y: p.y }); }
+  if (S.t < T.end) return true;
+  // tra kiếm xong: thời gian chạy lại, mọi thứ nằm trên đường đi mới bị chém
+  const w = { x1: S.x0, y1: S.y0, x2: p.x, y2: p.y }; let hits = 0;
+  for (const e of g.enemies) { if (e.dead || segDist(e.x, e.y, w) > AX.STOP_W + e.r) continue; g.hurtEnemy(e, AX.SEVER * (p.basicMul || 1), S.a + Math.PI / 2, 300, 'blast'); hits++; }
+  A.stop = null; A.needRelease = true; A.sheathT = 0; gain(A, AX.ILL_CUT + AX.ILL_FOLD * hits); g.hitstop = Math.max(g.hitstop, 0.12);
+  g.emit('axSever', { ...w, hits });
+  return true;
 }

@@ -395,7 +395,7 @@ function dragonCleave(c, o, k) {
 }
 dragonKnight.basic = (R, e) => {
   if (e.ev === 'swing') {
-    const big = e.charge > 0.3, r = (e.reach || 104) * (big ? 1.15 : 1.05), arc = e.arc || 1.4, dir = e.combo % 2 ? 1 : -1;
+    const big = e.charge > 0.3, r = (e.reach || 104) * (big ? 1.15 : 1.05), arc = e.arc || 1.4, dir = e.dir || (e.combo % 2 ? 1 : -1);
     spawn(R, dragonCleave, { x: e.x, y: e.y, a: e.a, r, arc, dir, big, T: big ? 0.42 : 0.32 });
     for (let i = 0; i < 9; i++) { const q = e.a + (i / 8 - 0.5) * arc, d = r * (0.6 + Math.random() * 0.4); part(R, e.x + Math.cos(q) * d, e.y + Math.sin(q) * d, Math.cos(q) * 30, -40 - Math.random() * 40, 0.9, i % 3 ? DK.g : DK.o, 3); if (i % 3 === 0) part(R, e.x + Math.cos(q) * d, e.y + Math.sin(q) * d, 0, -24, 1.1, '#241818', 7); }   // tàn vàng + khói núi lửa
     for (let i = 0; i < 3; i++) { const q = e.a + (i - 1) * arc * 0.3; clawMark(R, e.x + Math.cos(q) * r * 0.7, e.y + Math.sin(q) * r * 0.7 + 8, q, 0.7); }   // vết cháy ngắn trên nền

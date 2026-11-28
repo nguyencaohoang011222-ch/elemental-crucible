@@ -62,6 +62,17 @@ g.p.inv = 0; axState(g.p).illusion = 100; g.p.hp = 5; g.hurtPlayer(500, 0); ok(g
 g = mkI(99); g.p.hp = 5; g.hurtPlayer(500, 0); ok(g.over, 'needs a full bar');
 g = mkI(100); g.hurtPlayer(10, 0); ok(axState(g.p).illusion === 100, 'a non-lethal hit does not spend it');
 
+// ---------- Rapid Slash và Thuấn Trảm ----------
+g = mkI(0); f1 = foe(g, 160); f1.hp = f1.max = 1000; px = g.p.x; holdFull(g, 0.5); release(g); run(g, 0.4);
+ok(g.p.x - px > 180, 'late full release rushes forward');
+ok(1000 - f1.hp > 60, 'the rush cuts the foe on its path more than once');
+g = mkI(0); g.labFreezeAI = false; f1 = foe(g, 200); f1.hp = f1.max = 1000; const ex = f1.x; px = g.p.x;
+holdFull(g, AX.STOP_HOLD + 0.2); const A2 = axState(g.p); ok(!!A2.stop, 'holding a full charge stops time');
+const t0 = g.t, fx0 = f1.x; run(g, 1.0, { fireHeld: true }); ok(g.t === t0 && Math.abs(f1.x - fx0) < 0.01 && f1.hp === 1000, 'the world and the clock are frozen, no damage yet');
+run(g, 1.3, { fireHeld: true }); ok(!A2.stop && g.p.x - px > 250 && f1.hp <= 1000 - AX.SEVER * 0.9, 'after the sheath the cut lands');
+ok(g.t > t0, 'the clock runs again');
+const pl = A2.planes.length; run(g, 0.5, { fireHeld: true }); release(g); ok(g.p.charge === 0 && !A2.rush, 'must let go before charging again');
+
 // một stage thật: không lỗi khi chạy
 const s = new Game(99, 'AXIOM', { element: 'FIRE' }); for (let i = 0; i < 900; i++) { s.p.hp = s.p.max; const f = s.enemies[0]; s.step(1 / 60, { ax: f ? f.x : 1, ay: f ? f.y : 0, fireHeld: i % 80 < 62, dash: i % 97 === 0, space: i % 130 === 0, spaceHeld: i % 260 < 40, slots: i % 150 === 0 ? [0] : [] }); s.events.length = 0; }
 ok(s.stage === 1, 'a real stage runs');
