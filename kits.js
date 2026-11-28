@@ -181,7 +181,7 @@ KITS.AXIOM = {
   'FIRE>WIND':   S('Scatter Cubes', 'DAMAGE', 6, 'rain', { range: 400, count: 6, duration: 0.45, area: 95, radius: 52, delay: 0.3, dmg: 26, burn: 2 }, ['area'], 'Six small cubes rain down and blow up one after another.'),
   'WATER>WATER': S('Glass Lance', 'CONTROL', 4, 'beam', { length: 520, width: 44, dmg: 52, freeze: 1.2 }, ['beam'], 'A pane of frozen glass slices straight ahead and freezes.'),
   'WATER>FIRE':  S('Searing Pane', 'DAMAGE', 5, 'beam', { length: 480, width: 56, dmg: 60, burn: 2.5 }, ['beam'], 'A red-hot pane cuts through the whole line.'),
-  'WATER>EARTH': S('Prism Wall', 'AREA', 6, 'beam', { length: 420, width: 60, dmg: 36, stun: 0.5, endBurst: { radius: 110, dmg: 40, stun: 0.6 } }, ['beam', 'area'], 'A heavy prism slides out and shatters at the end, stunning.'),
+  'WATER>EARTH': S('Prism Wall', 'AREA', 6, 'beam', { length: 420, width: 60, dmg: 41, stun: 0.5, endBurst: { radius: 110, dmg: 40, stun: 0.6 } }, ['beam', 'area'], 'A heavy prism slides out and shatters at the end, stunning.'),
   'WATER>WIND':  S('Shear Pane', 'CONTROL', 6, 'beam', { length: 560, width: 70, dmg: 30, push: 380, wet: 2 }, ['beam'], 'A wide pane of wind-glass shoves the whole line away.'),
   'EARTH>EARTH': S('Pillar Line', 'CONTROL', 5, 'spikes', { count: 6, spacing: 56, radius: 46, step: 0.05, dmg: 48, stun: 0.7 }, ['area'], 'Square pillars punch up in a line toward the cursor.'),
   'EARTH>FIRE':  S('Ember Pillars', 'AREA', 7, 'spikes', { count: 7, spacing: 52, radius: 42, step: 0.05, dmg: 34, burn: 2.5, leaveEach: { kind: 'fire', radius: 30, life: 2.2 } }, ['area', 'zone'], 'Glowing pillars rise and leave the ground burning.'),
