@@ -7,7 +7,7 @@ import { defaultMods, rollMinor, rollMajor, MINOR_BY_ID } from './upgrades.js';
 import { BOSS_DEFS, makeBoss, bossUpdate, updateHazards, poiseDamage } from './boss.js';
 import { themeForStage } from './env.js';
 import { buildArena, teardownArena, ARENA_R } from './arena.js';
-import { castUlt, updateUlts } from './ults.js';
+import { ultOnCast, castUlt, updateUlts } from './ults.js';
 import { tickDefense, withPhantom, dmgTakenMul, critMul, clearShots, heal, tickHeal } from './defense.js';
 import { forgeDef, onCast, onHit, onTrap, onKill as onKillF, onDashEnd, onZone, onShot, onShotEnd } from './forgeups.js';
 import { relicBasic, relicHit, relicKill, relicCastAim, relicAfterCast, relicBlocksEnergy, healMul, tickRelics, relicShots, relicExplode, canBloodPay, bloodPay } from './relics.js';
@@ -74,6 +74,14 @@ const OWNED = ['shots', 'zones', 'pending', 'traps', 'walls', 'ults', 'relicFx']
 // ---------- luật cân bằng chung (vòng lặp /tune được phép chỉnh các số này) ----------
 // CD: hồi chiêu riêng từng chiêu = cd định nghĩa × scale
 export const CD = { scale: 0.45 };
+// COST: giá chiêu đơn / đôi = (flat + perCd × cd định nghĩa) × tier[hạng]; tuyệt kỹ giữ ultCost (% thanh năng lượng) × tier[2]
+// (bench giao tranh cho thấy tuyệt kỹ đã đáng giá nhất trên mỗi mana; chiêu đơn rẻ quá nên đắt hơn 15%)
+// RESONANCE: tung chiêu ghép 3 nguyên tố → buff t giây theo từng nguyên tố của nó.
+// Lửa: +fire sát thương chiêu · Nước: hồi waterHeal × máu tối đa / s (vẫn trong trần) + xoá làm chậm/đóng băng · Đất: khiên earthShield × máu tối đa + miễn khống chế · Gió: +windSpeed tốc chạy, hồi chiêu chạy windCd lần nhanh hơn
+export const RESONANCE = { t: 5, fire: 0.2, waterHeal: 0.04, earthShield: 0.15, windSpeed: 0.2, windCd: 2 };
+// ULTFX: đặc sản tuyệt kỹ dùng chung (dấu nhận thêm sát thương có trần trên boss, ngưỡng kết liễu)
+export const ULTFX = { bossVulnCap: 0.15, execAt: 0.3 };
+export const COST = { flat: 7, perCd: 3.4, tier: [1.15, 1, 1] };
 export const BRUTAL = { count: 1.35, aggro: 1.4, elite: 0.55, bossWind: 0.78, bossIdle: 0.55, bossSpeed: 1.15, link: 0.25, twinSpread: 0.2 };
 export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
 export const MAP_HP = { forest: 1, dungeon: 1.2, frost: 1.4, volcano: 1.6, palace: 1.8 };   // máu gốc quái thường theo map
@@ -129,7 +137,8 @@ export class Game extends Sim {
     if (def.group === 'ULTIMATE') cd *= m.ultCd;
     const out = scaleDef(def, { dmg, rad, burn: m.burn, freeze: m.freeze, stun: m.stun, life: m.zoneLife, push: m.push });
     // chiêu 3 nguyên tố: giá theo sức mạnh thật (thang log): yếu ~35, mạnh nhất ~90
-    const base = def.ultCost ? def.ultCost / 100 * (CLASSES[this.p.cls].energy || 100) : def.tier === 3 ? Math.max(35, Math.min(90, 30 + 13 * Math.log(Math.max(1, skillPower(def)) / 40))) : 7 + def.cd * 3.4;
+    const tier = def.ultCost || def.tier === 3 ? 2 : els.length === 1 ? 0 : 1;
+    const base = (def.ultCost ? def.ultCost / 100 * (CLASSES[this.p.cls].energy || 100) : def.tier === 3 ? Math.max(35, Math.min(90, 30 + 13 * Math.log(Math.max(1, skillPower(def)) / 40))) : COST.flat + def.cd * COST.perCd) * COST.tier[tier];
     out.cost = Math.round(base * cd);
     // hồi chiêu riêng từng chiêu: cd trong định nghĩa × CD.scale (chiêu đơn ~1,4–3,6 s, tuyệt kỹ ~9 s); Focus / Mastery rút ngắn theo cùng hệ số giá
     out.cd = +(def.cd * cd * CD.scale).toFixed(2);
@@ -274,7 +283,9 @@ export class Game extends Sim {
   }
   tickPlayer(dt, it) {
     const p = this.p;
-    for (const k in p.cds) { p.cds[k] -= dt; if (p.cds[k] <= 0) delete p.cds[k]; }
+    const R = p.res; let cdRate = 1;
+    if (R) { for (const k in R) if (R[k] > 0) R[k] -= dt; if (R.WIND > 0) cdRate = RESONANCE.windCd; if (R.WATER > 0) heal(this, p.max * RESONANCE.waterHeal * dt); if (R.EARTH > 0) { p.frozen = 0; p.rooted = 0; } p.resSpd = R.WIND > 0 ? 1 + RESONANCE.windSpeed : 1; }
+    for (const k in p.cds) { p.cds[k] -= dt * cdRate; if (p.cds[k] <= 0) delete p.cds[k]; }
     p.gcd = Math.max(0, p.gcd - dt); p.castAnim = Math.max(0, p.castAnim - dt);
     tickHeal(p, dt);
     const hr = (p.mods.regen || 0) + (CLASSES[p.cls].hpRegen || 0); if (hr && p.hp > 0) heal(this, hr * (p.mods.regenMul || 1) * dt);
@@ -299,6 +310,14 @@ export class Game extends Sim {
       else if (this.canAct() && p.gcd <= 0) { const q = p.queued; p.queued = null; this.castNow(q.sk, q.ax, q.ay); }
     }
   }
+  // cộng hưởng nguyên tố: buff theo các nguyên tố của tuyệt kỹ vừa tung (xem RESONANCE)
+  resonate(els) {
+    const p = this.p, R = p.res || (p.res = {}), T = RESONANCE.t;
+    for (const el of els) R[el] = T;
+    if (els.includes('WATER')) { p.slowT = 0; p.frozen = 0; p.chill = 0; }
+    if (els.includes('EARTH')) { p.shield = Math.max(p.shield || 0, p.max * RESONANCE.earthShield); p.shieldT = Math.max(p.shieldT || 0, T); }
+    this.emit('resonance', { x: p.x, y: p.y, els: els.slice() });
+  }
   canAct() { const p = this.p; return !p.leap && p.sdashT <= 0; }
   tryCast(sk, it) {
     const p = this.p;
@@ -314,7 +333,8 @@ export class Game extends Sim {
     const p = this.p, free = p.freeCast === sk.key && p.freeCastT > 0;
     if (!free && p.energy < sk.cost && !canBloodPay(this, sk.cost)) { this.emit('noEnergy', { name: sk.name, cost: sk.cost }); return; }
     if (free) { p.freeCast = null; p.freeCastT = 0; this.emit('freeCast', { x: p.x, y: p.y }); } else if (p.energy >= sk.cost) p.energy -= sk.cost; else bloodPay(this, sk.cost);   // Blood Magic: phần thiếu trả bằng máu
-    if (!free && sk.cd > 0) p.cds[sk.key] = sk.cd;   // bản sao miễn phí (Echo, Wild, tung lại) không tính hồi chiêu
+    if (!free && sk.cd > 0) p.cds[sk.key] = sk.cd;
+    if (!free && sk.group === 'ULTIMATE' && sk.els && sk.els.length >= 3) this.resonate(sk.els);   // bản sao miễn phí (Echo, Wild, tung lại) không tính hồi chiêu
     this._castCost = free ? 0 : sk.cost; p.gcd = 0.25; p.castAnim = 0.25; this.casts++;
     const first = !this.discovered.has(sk.key); this.discovered.add(sk.key);
     if (sk.els.length > 1 && p.mods.comboFlow) this.gainEnergy(p.mods.comboFlow);
@@ -328,6 +348,7 @@ export class Game extends Sim {
     if (sk.dual) { const [a, b] = sk.dual; run(a, () => { this.execute(a, ax, ay); terraform(this, a, ...tgt(a)); }); this.pend(0.06, () => run(b, () => { this.execute(b, ax, ay); terraform(this, b, ...tgt(b)); })); } else if (sk.ult) castUlt(this, sk, ax, ay); else run(sk, () => { this.execute(sk, ax, ay); terraform(this, sk, ...tgt(sk)); });
     } finally { this._fx = fxPrev; }
     relicAfterCast(this, sk, ax, ay);
+    ultOnCast(this, sk, ax, ay, free);
   }
 
   // ---------- công cụ đánh ----------
@@ -485,12 +506,13 @@ export class Game extends Sim {
     for (let i = 0; i < A.count; i++) this.proj('sarrow', p.x, p.y, a + (A.count > 1 ? (i - (A.count - 1) / 2) * A.spread / (A.count - 1) * 2 : 0), A, sk);
   }
 
-  basicAttack(c) { const p = this.p, m = p.nextBasic; if (m) { p.nextBasic = 0; p.basicMul *= m; } try { relicBasic(this, c, () => super.basicAttack(c)); } finally { if (m) p.basicMul /= m; } }
+  basicAttack(c) { this.basicN = (this.basicN || 0) + 1; const p = this.p, m = p.nextBasic; if (m) { p.nextBasic = 0; p.basicMul *= m; } try { relicBasic(this, c, () => super.basicAttack(c)); } finally { if (m) p.basicMul /= m; } }
   explode(s) { const was = s.boomed; super.explode(s); if (!was && s.boomed) relicExplode(this, s); }
   // ---------- trạng thái và sát thương ----------
   applyHit(e, eff, a, sk) {
     if (e.dead) return;
     let dmg = eff.dmg || 0;
+    if (eff.exec && e.hp < e.max * ULTFX.execAt) dmg *= 1 + eff.exec;   // kết liễu (Meteor Blade)
     if (sk) { e._lastSk = sk; if (sk.forge && dmg > 0) onHit(this, e, sk); }
     if (eff.freeze) e.frozeHit = 0.6;
     if (eff.burn && e.wet > 0) { e.wet = 0; dmg *= 1.3; this.emit('steamPop', { x: e.x, y: e.y }); }
@@ -529,6 +551,8 @@ export class Game extends Sim {
       kb *= 0.15;
     }
     if (e.fMark > 0) dmg *= 1.15;
+    if (e.vulnUntil > this.t) dmg *= 1 + (e.boss ? Math.min(ULTFX.bossVulnCap, e.vuln) : e.vuln);   // đánh dấu của tuyệt kỹ (Pentagram, Abyssal Tide, Firestorm); boss có trần
+    if ((kind === 'skill' || kind === 'echo') && this.p.res && this.p.res.FIRE > 0) dmg *= 1 + RESONANCE.fire;
     dmg *= relicHit(this, e, kind);
     dmg *= critMul(this, e, dmg, kind);
     this.stats.dmg += dmg;

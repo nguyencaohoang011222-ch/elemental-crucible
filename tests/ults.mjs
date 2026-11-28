@@ -76,7 +76,7 @@ const bossGame = (cls, stage = 20) => { const g = new Game(11, cls); g.startStag
   const [dh, nh] = aimDist(true), [dv, nv] = aimDist(false);
   ok(nh >= 3 && nv >= 3 && dh > dv * 1.5 && dh > 200, `Stealth: titan attacks land ${Math.round(dh)}px from you on average (visible: ${Math.round(dv)}px; ${nh}/${nv} attacks)`);
   ok(Math.hypot(g.hidePt ? g.hidePt.x - seen0.x : 0, g.hidePt ? g.hidePt.y - seen0.y : 0) < 200 || p.stealthT <= 0, 'the titan hunts near where you vanished');
-  const e = b; p.stealthT = 1; p.crit = { mult: 2.5, t: Infinity, stealth: true }; const h0 = e.hp; e.stagger = 0; e.invuln = 0; g.hurtEnemy(e, 40, 0, 0, 'skill');
+  const e = b; p.res = null; p.stealthT = 1; p.crit = { mult: 2.5, t: Infinity, stealth: true }; const h0 = e.hp; e.stagger = 0; e.invuln = 0; g.hurtEnemy(e, 40, 0, 0, 'skill');
   ok(Math.abs((h0 - e.hp) - 100) < 1 && !p.crit && p.stealthT === 0, `the first hit after stealth deals ×2.5 (${Math.round(h0 - e.hp)}) and reveals you`); }
 // Slow motion (Monsoon rèn): quái đi được ~35% quãng đường
 { const run = slow => { const g = new Game(8, 'KNIGHT'); g.startStage(3); g.enemies = []; const e = g.spawnAt('GRUNT', g.p.x + 500, g.p.y); e.spawn = 0; if (slow) g.p.slowmoT = 5; const x0 = e.x; for (let i = 0; i < 60; i++) g.step(1 / 60, {}); return Math.abs(e.x - x0); };

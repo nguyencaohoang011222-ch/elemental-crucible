@@ -171,7 +171,7 @@ export class Sim {
     }
     const slow = p.charge > 0.12 ? (p.cls === 'KNIGHT' && p.mods && p.mods.relentless ? 1 : 0.5) : (p.swing > 0 ? 0.6 : 1);   // Relentless Blade: tụ lực không bị chậm
     if (p.dashT > 0) { p.dashT -= dt; p.vx = p.dashX * C.dash.speed; p.vy = p.dashY * C.dash.speed; }
-    else { const k = 1 - Math.exp(-16 * (sf ? sf.grip : 1) * dt); const spd = C.speed * (p.speedMul || 1) * (sf ? sf.spd : 1) * (p.slowT > 0 ? 0.5 : 1) * (p.hasteT > 0 ? 1.5 : 1) * (p.bladeOut ? 0.9 : 1); p.vx += (mx * spd * slow - p.vx) * k; p.vy += (my * spd * slow - p.vy) * k; }
+    else { const k = 1 - Math.exp(-16 * (sf ? sf.grip : 1) * dt); const spd = C.speed * (p.speedMul || 1) * (sf ? sf.spd : 1) * (p.slowT > 0 ? 0.5 : 1) * (p.hasteT > 0 ? 1.5 : 1) * (p.resSpd || 1) * (p.bladeOut ? 0.9 : 1); p.vx += (mx * spd * slow - p.vx) * k; p.vy += (my * spd * slow - p.vy) * k; }
     p.x += p.vx * dt; p.y += p.vy * dt; this.world.collide(p, p.r);
 
     // tấn công: giữ chuột trái để tụ lực, nhả để đánh; bấm nhanh = đòn thường. Luôn đánh về phía con trỏ.

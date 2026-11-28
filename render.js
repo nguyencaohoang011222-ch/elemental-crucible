@@ -161,6 +161,7 @@ export class Renderer {
         case 'brace': if (!e.on) this.num(e.x, e.y - 40, 'BRACED', '#e6d29a'); break;
         case 'refund': this.num(e.x, e.y - 36, '+energy', '#7fb0ff'); break;
         case 'freeCast': this.castText = { s: 'FREE RECAST', c: '#a6ebcb', t: 0.8, T: 0.8 }; break;
+        case 'resonance': this.castText = { s: 'RESONANCE: ' + e.els.map(k => ({ FIRE: 'Fire', WATER: 'Water', EARTH: 'Earth', WIND: 'Wind' })[k]).join(' · '), c: '#f0a8ff', t: 1.4, T: 1.4 }; break;
         case 'forgeCover': this.puff(e.x, e.y, 8, Math.max(30, e.r), (this.T && this.T.dust) || '#c8b890'); break;
         case 'forgeNear': this.banner = { s: 'A FORGE IS NEARBY', sub: e.name + ' will trade with you — follow the arrow', t: 2.6, T: 2.6, c: '#ffd34a', small: true }; break;
         case 'forged': break;
@@ -264,7 +265,7 @@ export class Renderer {
   }
 
   draw(sim, ui) {
-    const t0 = performance.now(), dt = ui.dt, p = sim.p, W = this.W, H = this.H; this.time += dt; this.dtNow = dt;
+    const t0 = performance.now(), dt = ui.dt, p = sim.p, W = this.W, H = this.H; this.time += dt; this.dtNow = dt; this.simT = sim.t;
     this.consume(sim, ui.sfx);
     const lx = Math.cos(p.aim) * Math.min(90, (ui.aimDist || 0) * 0.18), ly = Math.sin(p.aim) * Math.min(70, (ui.aimDist || 0) * 0.18);
     const ct = this.camTarget, k = 1 - Math.exp(-(ct && ct.k || 10) * dt), lead = (this.camLeadK || 0) * W / this.zoom, tx = ct ? ct.x : p.x + lx + lead, ty = ct ? ct.y : p.y + ly; this.camX += (tx - this.camX) * k; this.camY += (ty - this.camY) * k;
@@ -604,7 +605,8 @@ export class Renderer {
     }
     if (!post) for (const w of sim.walls) {
       ctx.save(); ctx.globalAlpha = Math.min(1, w.life / 0.5); ctx.lineCap = 'round';
-      if (w.stone) { ctx.strokeStyle = '#3a3026'; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); ctx.strokeStyle = '#a08a66'; ctx.lineWidth = 12; ctx.stroke(); }
+      if (w.lava) { ctx.strokeStyle = '#3a1a10'; ctx.lineWidth = 20; ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); ctx.strokeStyle = '#ff7a2a'; ctx.lineWidth = 8; ctx.stroke(); }
+      else if (w.stone) { ctx.strokeStyle = '#3a3026'; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); ctx.strokeStyle = '#a08a66'; ctx.lineWidth = 12; ctx.stroke(); }
       else { ctx.strokeStyle = 'rgba(210,255,240,.85)'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); }
       ctx.restore();
     }
@@ -678,6 +680,8 @@ export class Renderer {
     else if (!blink) ctx.drawImage(this.hurtFlash > 0 ? (Math.floor(this.hurtFlash * 30) % 2 ? fr.white : fr.red) : fr.img, X, Y, W, H);
     ctx.restore();
     if (p.goldT > 0) this.hourglass(ctx, p.x, p.y - 69 - z, 1 - p.goldT / (p.goldT0 || 1));
+    // hào quang cộng hưởng: mỗi nguyên tố đang có buff là một vòng nhỏ màu riêng quay quanh chân
+    if (p.res) { let i = 0; for (const k of ['FIRE', 'WATER', 'EARTH', 'WIND']) { const v = p.res[k]; if (!(v > 0)) continue; const a = t * 2.4 + i * 1.57; ctx.strokeStyle = rgba(({ FIRE: '#ff8a3c', WATER: '#5bb8ff', EARTH: '#d4b46e', WIND: '#a6ebcb' })[k], 0.35 + 0.35 * Math.min(1, v)); ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, p.y - 2 - z, 24 + i * 3, 9 + i, 0, a, a + 4.2); ctx.stroke(); i++; } }
     if (p.shield > 0 && !(p.goldT > 0)) { ctx.strokeStyle = rgba('#e6d29a', 0.35 + 0.15 * Math.sin(t * 7)); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y - 14 - z, 30, 33, 0, 0, 7); ctx.stroke(); }
     if (p.rooted > 0) { ctx.strokeStyle = '#5a8a2a'; ctx.lineWidth = 4; for (let i = 0; i < 6; i++) { const a = i * 1.05 + 0.3; ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * 22, p.y + 10 + Math.sin(a) * 9); ctx.quadraticCurveTo(p.x + Math.cos(a) * 8, p.y - 6, p.x + Math.cos(a + 0.6) * 10, p.y - 22 + i % 3 * 6); ctx.stroke(); } this.wtext(p.x, p.y - 57, 'ROOTED — dash to break!', '#a8e070', 11); }
     if (p.frozen > 0) { ctx.fillStyle = 'rgba(170,225,255,.55)'; ctx.fillRect(sn(p.x) - 24, sn(p.y) - 48, 48, 60); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.strokeRect(sn(p.x) - 24, sn(p.y) - 48, 48, 60); ctx.fillStyle = '#ffffff'; ctx.fillRect(sn(p.x) - 18, sn(p.y) - 42, 6, 18); this.wtext(p.x, p.y - 57, 'FROZEN — dash to break!', '#bfe8ff', 11); }
@@ -756,6 +760,8 @@ export class Renderer {
     if (e.root > 0) { ctx.strokeStyle = '#6a8a3a'; ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(e.x, e.y + 6, 10 + i * 3, i, i + 2.4); ctx.stroke(); } }
     if (e.burn > 0) for (let i = 0; i < 3; i++) { const f = 6 + Math.sin(t * 12 + i * 2 + e.id) * 3; ctx.fillStyle = i === 1 ? '#ffd36b' : '#ff7a3c'; ctx.fillRect(e.x - 9 + i * 7, e.y - 26 * sc - f, 5, f + 5); }
     if (e.wet > 0) { ctx.fillStyle = '#7fc4ff'; for (let i = 0; i < 3; i++) ctx.fillRect(e.x - 8 + i * 7, e.y - 30 * sc + ((t * 40 + i * 9) % 16), 2, 4); }
+    // dấu "nhận thêm sát thương" của tuyệt kỹ: hình thoi tím nhấp nháy trên đầu
+    if (e.vulnUntil > (this.simT || 0)) { const y = e.y - (e.boss ? e.r + 34 : 40 * sc), s = 5 + Math.sin(t * 9) * 1.2; ctx.fillStyle = '#f0a8ff'; ctx.beginPath(); ctx.moveTo(e.x, y - s); ctx.lineTo(e.x + s, y); ctx.lineTo(e.x, y + s); ctx.lineTo(e.x - s, y); ctx.fill(); }
     if (e.blind > 0) this.wtext(e.x, e.y - 44 * sc, '? ?', '#e8eef2', 11);
     if (e.stun > 0) this.wtext(e.x, e.y - 44 * sc, '* *', '#ffe27a', 12);
   }

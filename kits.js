@@ -152,22 +152,22 @@ const X = (name, ult, cost, pal, tags, desc, params) => ({ name, ult, ultCost: c
 // giá = % năng lượng gốc của class (Knight 100, Ranger 70, Mage 150)
 const ULTS = {
   KNIGHT: {
-    FIRE: X('Meteor Blade', 'meteorblade', 70, 'ember', ['melee', 'area'], 'Three leaping meteor strikes that chain to nearby foes, each cracking the ground and spraying burning rock.', { slam: { dmg: 75, burn: 2, stun: 0.4 }, rock: { dmg: 20 } }),
-    WATER: X('Monsoon Dance', 'monsoon', 68, 'tide', ['melee'], 'Five lightning-fast slashes that leap from foe to foe, ending in a steam burst.', { strike: { dmg: 62, wet: 2 }, finale: { dmg: 65, blind: 1.2 } }),
-    EARTH: X('Mountain Titan', 'titan', 72, 'stone', ['melee', 'area'], 'Grow into a stone giant for 6s: you take half damage and every swing becomes a ground-shaking stomp.', { stomp: { dmg: 70, stun: 1.0 }, swing: { dmg: 50, stun: 0.5, push: 240 } }),
-    WIND: X('Sunder Cyclone', 'sunder', 70, 'gale', ['melee', 'area'], 'Spin in the air for 3s hurling rocks in every direction, then crash down.', { tick: { dmg: 17, push: 160 }, rock: { dmg: 18 }, land: { dmg: 75, stun: 0.6 } })
+    FIRE: X('Meteor Blade', 'meteorblade', 70, 'ember', ['melee', 'area'], 'Three leaping meteor strikes that chain to nearby foes. Execute: +60% damage to foes under 30% HP, and every kill adds another strike.', { slam: { dmg: 75, burn: 2, stun: 0.4 }, rock: { dmg: 20 }, exec: 0.6, chain: 3 }),
+    WATER: X('Monsoon Dance', 'monsoon', 68, 'tide', ['melee'], 'Five lightning-fast slashes that leap from foe to foe; you cannot be hit while dancing. Each kill adds a slash (up to 8).', { strike: { dmg: 62, wet: 2 }, finale: { dmg: 65, blind: 1.2 }, maxStrikes: 8 }),
+    EARTH: X('Mountain Titan', 'titan', 72, 'stone', ['melee', 'area'], 'Grow into a stone giant for 6s: half damage, a shield of 30% max HP, immune to control, nearby foes are dragged in, and every swing is a slowing stomp.', { stomp: { dmg: 70, stun: 1.0 }, swing: { dmg: 50, stun: 0.5, push: 240 }, titanShield: 0.3, tauntR: 250, stompSlow: [0.4, 1.5] }),
+    WIND: X('Sunder Cyclone', 'sunder', 70, 'gale', ['melee', 'area'], 'Spin in the air for 3s, sucking foes in and hurling rocks, then crash down: the more foes pulled in, the longer they are stunned.', { tick: { dmg: 17, push: 160 }, rock: { dmg: 18 }, land: { dmg: 75, stun: 0.6 }, pullR: 300 })
   },
   RANGER: {
-    FIRE: X('Meteor Arrow', 'meteorarrow', 72, 'ember', ['projectile', 'area'], 'Draw a colossal arrow that tears across the field, meteors crashing down along its path.', { big: { dmg: 160, burn: 2 }, meteor: { dmg: 72, burn: 2, stun: 0.4 } }),
-    WATER: X('Pentagram Snares', 'pentagram', 66, 'tide', ['trap', 'area'], 'Five snares form a pentagram: trigger one and the whole star detonates in linked beams.', { beam: { dmg: 60, wet: 2 }, blast: { dmg: 65, wet: 3, root: 1.2 } }),
-    EARTH: X('Firestorm Barrage', 'airstrike', 70, 'stone', ['area'], 'Call three carpet-bombing runs of arrows in a line toward the cursor.', { bomb: { dmg: 50, stun: 0.25 } }),
-    WIND: X('Mirage', 'mirage', 64, 'gale', ['projectile', 'mobility'], 'Tumble away leaving three mirages that lure and blind foes, shoot arrows, then explode.', { arrow: { dmg: 14 }, boom: { dmg: 40 } })
+    FIRE: X('Meteor Arrow', 'meteorarrow', 72, 'ember', ['projectile', 'area'], 'Draw a colossal arrow that pierces across the whole field. Meteors crash down along its path, stunning longer the farther they fall.', { big: { dmg: 160, burn: 2 }, meteor: { dmg: 72, burn: 2, stun: 0.4 } }),
+    WATER: X('Pentagram Snares', 'pentagram', 66, 'tide', ['trap', 'area'], 'Five snares form a pentagram that detonates after 1s (or when stepped on), rooting everything inside and marking it to take 25% more damage for 5s.', { beam: { dmg: 60, wet: 2 }, blast: { dmg: 65, wet: 3, root: 1.2 }, autoFire: 1, markAmt: 0.25, markT: 5 }),
+    EARTH: X('Firestorm Barrage', 'airstrike', 70, 'stone', ['area'], 'Call three carpet-bombing runs toward the cursor. Foes caught are slowed by 40% and take 15% more damage for 3s.', { bomb: { dmg: 50, stun: 0.25 }, carpetSlow: [0.4, 1.5], shred: 0.15 }),
+    WIND: X('Mirage', 'mirage', 64, 'gale', ['projectile', 'mobility'], 'Tumble away leaving three mirages for 5s. They lure and blind foes, copy every basic attack you fire, then explode.', { arrow: { dmg: 14 }, boom: { dmg: 40 }, copy: { dmg: 12 }, decoyLife: 5 })
   },
   MAGE: {
-    FIRE: X('Solar Flare', 'solar', 72, 'solar', ['area'], 'A small sun descends, dragging foes in and scorching them, then collapses in a massive blast.', { tick: { dmg: 13, burn: 1 }, nova: { dmg: 135, burn: 2, push: 320 } }),
-    WATER: X('Abyssal Tide', 'abyss', 68, 'tide', ['area'], 'A towering wave sweeps across the entire screen, carrying every foe with it.', { wave: { dmg: 75, wet: 4, slow: [0.5, 2] }, crash: { dmg: 55, stun: 0.6 } }),
-    EARTH: X('Comet Trench', 'comettrench', 72, 'stone', ['area'], 'A colossal comet streaks down, carving a burning trench through the field.', { trench: { dmg: 95, burn: 2 }, impact: { dmg: 120, stun: 0.8 } }),
-    WIND: X('Thunderhead', 'thunderhead', 68, 'storm', ['area'], 'A storm cloud follows your cursor for 5s, striking foes below with lightning.', { bolt: { dmg: 56, stun: 0.25 } })
+    FIRE: X('Solar Flare', 'solar', 72, 'solar', ['area'], 'A small sun descends, dragging foes in and scorching them, then collapses: +15% blast damage for every foe caught (up to double).', { tick: { dmg: 13, burn: 1 }, nova: { dmg: 135, burn: 2, push: 320 }, packBonus: 0.15, packMax: 2 }),
+    WATER: X('Abyssal Tide', 'abyss', 68, 'tide', ['area'], 'A towering wave sweeps the whole screen, carrying foes with it. Drowned foes take 30% more damage for 4s; each foe hit refunds 3 energy.', { wave: { dmg: 75, wet: 4, slow: [0.5, 2] }, crash: { dmg: 55, stun: 0.6 }, drown: 0.3, refund: 3 }),
+    EARTH: X('Comet Trench', 'comettrench', 72, 'stone', ['area'], 'A colossal comet streaks down and carves a burning trench that stands as a wall for 4s, blocking foes.', { trench: { dmg: 95, burn: 2 }, impact: { dmg: 120, stun: 0.8 }, wallT: 4 }),
+    WIND: X('Thunderhead', 'thunderhead', 68, 'storm', ['area'], 'A storm cloud follows your cursor for 5s. Storm mode: single-element skills cost half and each one calls an extra lightning bolt.', { bolt: { dmg: 56, stun: 0.25 }, stormRefund: 0.5 })
   }
 };
 export const ULT_TABLE = ULTS;
