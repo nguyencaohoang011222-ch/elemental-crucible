@@ -171,6 +171,8 @@ const ULTS = {
   }
 };
 export const ULT_TABLE = ULTS;
+// Axiom đang thử: tạm dùng bộ chiêu nguyên tố của Knight cho tới khi có 16 chiêu hình khối riêng
+KITS.AXIOM = KITS.KNIGHT; ULT.AXIOM = ULT.KNIGHT; ULTS.AXIOM = ULTS.KNIGHT;
 // 12 chiêu ghép 3 trong cả game: mỗi lớp 4 bộ = C(4,3). Thứ tự ghép không quan trọng; bộ nhận diện bằng nguyên tố bị thiếu.
 // MISS_TO_ULT[lớp][nguyên tố thiếu] = khoá trong ULTS (giữ nguyên cơ chế/icon/VFX cũ).
 const MISS_TO_ULT = {
@@ -178,6 +180,7 @@ const MISS_TO_ULT = {
   RANGER: { WATER: 'FIRE', EARTH: 'WIND', WIND: 'EARTH', FIRE: 'WATER' },
   MAGE:   { WATER: 'EARTH', EARTH: 'WIND', WIND: 'FIRE', FIRE: 'WATER' }
 };
+MISS_TO_ULT.AXIOM = MISS_TO_ULT.KNIGHT;
 export const triSort = els => EL.filter(e => els.includes(e));
 export const triMissing = els => EL.find(e => !els.includes(e));
 export const TRI_SETS = EL.map(m => EL.filter(e => e !== m)); // 4 bộ, đã sắp

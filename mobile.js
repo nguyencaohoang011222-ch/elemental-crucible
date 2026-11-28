@@ -5,9 +5,9 @@
 //   nút chiêu → chạm: tung vào địch gần nhất · kéo: hiện vạch nhắm, thả để tung · kéo về giữa nút: huỷ
 //   nút lướt  → lướt theo hướng joystick (đứng yên thì theo hướng nhắm)
 const JOY_R = 56, DEAD = 0.12, AIM_PX = 70, CANCEL_PX = 16, TAP_MOVE = 14;
-const ATK_RANGE = { KNIGHT: 240, RANGER: 560, MAGE: 480 }, SKILL_RANGE = 620, SKILL_REACH = 420;
+const ATK_RANGE = { KNIGHT: 240, RANGER: 560, MAGE: 480, AXIOM: 240 }, SKILL_RANGE = 620, SKILL_REACH = 420;
 
-let O = null, root = null, joyEl = null, knobEl = null, atkEl = null, dashEl = null, skEls = [], potEls = {};
+let O = null, root = null, joyEl = null, knobEl = null, atkEl = null, dashEl = null, skEls = [], potEls = {}, spaceEl = null;
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const atk = { id: null, down: false, seen: false, upPending: false, ox: 0, oy: 0, dx: 0, dy: 0, moved: false };
 const sk = { id: null, i: -1, ox: 0, oy: 0, dx: 0, dy: 0, aiming: false, cancel: false };
@@ -40,6 +40,7 @@ export function initMobile(opts) {
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   });
   dashEl.addEventListener('pointerdown', e => { e.preventDefault(); O.dash(); dashEl.classList.add('on'); setTimeout(() => dashEl.classList.remove('on'), 120); });
+  spaceEl = root.querySelector('.tspace'); spaceEl.addEventListener('pointerdown', e => { e.preventDefault(); O.space(); spaceEl.classList.add('on'); setTimeout(() => spaceEl.classList.remove('on'), 120); });
   for (const k of ['hp', 'en']) potEls[k].addEventListener('pointerdown', e => { e.preventDefault(); O.potion(k); });
   root.addEventListener('contextmenu', e => e.preventDefault());
 }
@@ -90,5 +91,6 @@ export function syncTouch(g, iconSkill) {
   skEls.forEach((el, i) => { const c = p.cores[i]; if (c) el.classList.toggle('poor', p.energy < g.coreSkill(c).cost); });
   for (const k of ['hp', 'en']) { const n = (p.potions || {})[k] || 0, el = potEls[k]; el.classList.toggle('empty', !n); const s = el.querySelector('span'); if (s && s.textContent !== String(n)) s.textContent = n; }
   dashEl.classList.toggle('cd', (p.dashCd || 0) > 0);
+  spaceEl.classList.toggle('hidden', p.cls !== 'AXIOM'); if (p.cls === 'AXIOM') spaceEl.classList.toggle('cd', !(p.ax && p.ax.planes.length));
 }
 export function markTouchDirty() { barSig = ''; }

@@ -34,6 +34,7 @@ import { drawUlts, ultEvent, drawUltEvents, ultCastFx } from './gfx/ultvfx.js';
 import { drawRelics } from './gfx/relicvfx.js';
 import { drawSigils, drawFoeTells, drawFoeShot, drawLobs, holeEye, reticle, drawIceSpikes } from './gfx/foevfx.js';
 import { HAND_Y } from './gfx/skinlines.js';
+import { axiomEvent, axiomUnder, axiomOver } from './gfx/axiomfx.js';
 import { Rig, heroPose, enemyPose, bossPose, weapon, ENEMY_SIZE, ENEMY_FEET, BOSS_DRAW, HERO_MX, HERO_MY, skinWeapon, lookAnim, staffTip } from './gfx/rig.js';
 import { EL_INFO, GROUP_COLOR } from './kits.js';
 import { BOSS_DEFS } from './boss.js';
@@ -111,6 +112,7 @@ export class Renderer {
     const skfx = sim.p && sim.p.skinFx;
     for (const e of sim.events) { try {
       if (sfx && sfx[e.ev]) sfx[e.ev](e);
+      if (sim.p.cls === 'AXIOM') { axiomEvent(this, e); if (e.ev === 'axFold') this.addShake(e.box ? 12 : 6); }
       if (e.ev === 'shoot' && sim.p.cls === 'MAGE') this._mzT = 0.1;   // loé đầu trượng 2–3 khung
       let skCat = null, skTh = null;
       if (skfx && SKIN_VIS.has(e.ev)) { skCat = e.fx || (e.ev === 'swing' || e.ev === 'knightWave' || e.ev === 'shoot' || (e.ev === 'boom' && !e.el) || (e.ev === 'hit' && ARROW_K.has(e.kind)) ? 'basic' : e.ev === 'trapPop' ? 'single' : e.ev === 'dash' ? 'move' : e.ev === 'ultfx' || e.ev === 'ultCast' ? 'ult' : null); if (skCat && SKF.covers(skfx, skCat)) skTh = SKF.themeOf(skfx.theme); }
@@ -663,6 +665,7 @@ export class Renderer {
     if (p.cls === 'MAGE' && p.charge > 0.08) this.magicCircle(ctx, p.x, p.y + 10, 24 + 20 * p.charge, skb ? skb.pal[2] : '#9b8cff', t * 2.5, 0.4 + p.charge * 0.5);
     const pose = heroPose(p, t, moving); if (p.skin && lookAnim(p.cls, p.skin)) pose.af = Math.floor(t / 0.14) % 4;
     const fr = this.rig.frame('h', p.cls + (p.skin ? ':' + p.skin : ''), pose), W = fr.img.width * WPP, H = fr.img.height * WPP, X = -(9 + HERO_MX) * WPP, Y = 12 - (22 + HERO_MY) * WPP;
+    if (p.cls === 'AXIOM') axiomUnder(this, ctx, sim, this.dtNow || 0.016, { img: fr.white, X, Y, W, H });
     if (skm) SKV.dash(this, ctx, p, fr, skm, X, Y, W, H, dashing, dtn);   // bóng ảnh nhiều khung theo tư thế thật
     else if (dashing) for (let i = 1; i <= 3; i++) { ctx.save(); ctx.globalAlpha = 0.28 / i; ctx.translate(sn(p.x - dx * i * 15), sn(p.y - dy * i * 15 - z)); ctx.scale(p.face, 1); ctx.drawImage(fr.white, X, Y, W, H); ctx.restore(); }
     if (dashing && this.opts.trail) for (let i = 0; i < 3; i++) this.parts.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y - 10 + (Math.random() - 0.5) * 30, vx: -dx * 60 + (Math.random() - 0.5) * 40, vy: -dy * 60 - 20, life: 0.5, max: 0.5, c: this.opts.trail[i % 2], s: 4 });
@@ -702,12 +705,19 @@ export class Renderer {
         ctx.strokeStyle = '#eee'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(14 + Math.cos(-1.25) * 16, Math.sin(-1.25) * 16); ctx.lineTo(14 - c * 12 + rec, 0); ctx.lineTo(14 + Math.cos(1.25) * 16, Math.sin(1.25) * 16); ctx.stroke();
         if (c > 0) { ctx.fillStyle = c >= 0.75 ? '#fff6a0' : '#d8d0b0'; ctx.fillRect(2 - c * 12, -1.5, 28, 3); }
       }
+    } else if (p.cls === 'AXIOM') {
+      const dir = p.swingDir || 1;
+      let off = 2.5 * p.face;   // đứng nghỉ: kiếm kéo sau
+      if (p.charge > 0.05) off = 2.9 * p.face;
+      if (p.swing > 0) { const k = 1 - p.swing / Math.max(0.05, this.swT); off = (-1.5 + 3 * Math.min(1, k * 1.5)) * dir; }
+      if (!(p.ax && p.ax.foldT > 0)) { ctx.rotate(off); ctx.fillStyle = '#141013'; ctx.fillRect(3, -6, 60, 9); ctx.fillStyle = '#3a3278'; ctx.fillRect(6, -3, 12, 3); ctx.fillStyle = '#a27ae0'; ctx.fillRect(18, -6, 3, 9); ctx.fillStyle = '#eef4ff'; ctx.fillRect(21, -3, 39, 3); ctx.fillStyle = '#9ab0ee'; ctx.fillRect(21, 0, 33, 3); }
     } else {
       const up = p.castAnim > 0 || p.charge > 0.05 ? -0.5 * (p.face || 1) : 0; ctx.rotate(up);
       const st = skw ? skw.img : weapon('staff'); ctx.drawImage(st, -4, -st.height * WPP / 2, st.width * WPP, st.height * WPP);
       this._tipD = skw ? -4 + (staffTip(skw.sp) + 1.5) * WPP : 48; this._tipA = up;   // vị trí đầu trượng (vẽ tia sáng pixel sau khi restore)
     }
     ctx.restore();
+    if (p.cls === 'AXIOM') axiomOver(this, ctx, sim, t, this.dtNow || 0.016);
     if (skb && p.charge > 0.05) SKV.charge(this, ctx, p, skb, t, sim);
     if (p.cls === 'MAGE') { const a = p.aim + (this._tipA || 0); this._mzT = Math.max(0, (this._mzT || 0) - (this.dtNow || 0.016)); SKV.muzzle(this, ctx, p.x + Math.cos(a) * this._tipD, p.y + HAND_Y - z + Math.sin(a) * this._tipD, p.skinFx ? p.skinFx.theme : '', p.charge || 0, this._mzT / 0.1, t); }   // mọi Pháp sư: tia sáng pixel ở đầu trượng, không còn quả cầu tròn mờ
     if (p.charge > 0.05) {

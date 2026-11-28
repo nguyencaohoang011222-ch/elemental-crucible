@@ -4,6 +4,7 @@ import { Grid, shade, whiteOf, tintOf, hash2, mix } from './pixel.js';
 import { ENEMIES } from '../sim.js';
 import { BOSS_PIX } from './bosspix.js';
 import { BOSS_FORMS } from './bossforms.js';
+import { axiomGrid, axiomPose } from './axiomrig.js';
 import { SKINS } from '../profile.js';
 import { lookOf, applyLayer, PARTS, weaponSpec, swordGrid, bowGrid, staffGrid } from './skinlooks.js';
 export { lookAnim, weaponSpec, BOW_TIP, staffTip } from './skinlooks.js';
@@ -23,9 +24,10 @@ export function heroGrid(cls, P) {
   // nhân vật nhỏ: tô phẳng theo bậc (không dither) cho sạch như pixel art vẽ tay
   const shade = (pal, v) => pal[Math.max(0, Math.min(pal.length - 1, Math.round(v * (pal.length - 1))))];
   const [cls0, skin] = cls.split(':'); cls = cls0; const sk0 = skin && (SKINS[cls] || []).find(s => s.id === skin), L = lookOf(cls, skin);
-  const g = new OGrid(HERO_W + HERO_MX * 2, HERO_H + HERO_MY, HERO_MX, HERO_MY), C = sk0 ? { ...HERO[cls], ...sk0.pal } : HERO[cls], by = P.by | 0, ln = P.lean | 0, robe = cls === 'MAGE';
+  const g = new OGrid(HERO_W + HERO_MX * 2, HERO_H + HERO_MY, HERO_MX, HERO_MY), C = (sk0 ? { ...HERO[cls], ...sk0.pal } : HERO[cls]) || {}, by = P.by | 0, ln = P.lean | 0, robe = cls === 'MAGE';
   const K = { g, cls, C, ln, by, P, af: P.af | 0, robe, hx: 4 + ln, hy: 3 + by + (P.hd | 0), L };
   const sk = (x, y) => shade(SKIN, 0.6, x, y);
+  if (cls === 'AXIOM') return axiomGrid(g, P);
   applyLayer(K, 'back');
   // áo choàng phía sau (nhìn sang phải nên áo bay về bên trái)
   if (C.cape && !(L && L.noCape)) { const f = P.cape | 0; for (let y = 10; y <= 17; y++) { const w = 3 + ((y - 10) >> 1), x0 = 6 + ln - w - (y > 12 ? f : 0); g.rect(x0, y + by, w + 2, 1, (i, j, x) => shade(C.cape, 0.25 + i / (w + 2) * 0.6, x, y)); } }
@@ -120,6 +122,7 @@ export function heroPose(p, t, moving) {
     const f = Math.floor(t / 0.24) % 4; P.by = f >= 2 ? 1 : 0; P.cape = f === 3 ? 1 : 0;
     if (t % 3.1 < 0.13) P.eyes = 'closed';
   }
+  if (p.cls === 'AXIOM') return axiomPose(p, t, moving, P);
   // thân trên theo hành động
   const ch = p.charge || 0;
   if (p.cls === 'KNIGHT') {

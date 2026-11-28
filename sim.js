@@ -1,4 +1,5 @@
 // A0 — cảm giác đánh. Mô phỏng tất định, không DOM.
+import { axiomTick, axiomDash, axiomAttack } from './axiom.js';
 export const TILE = 48, CHUNK = 12; // chunk = 12x12 ô
 
 export function rng(s) {
@@ -28,6 +29,8 @@ export const FOCUS_TIME = 1.2, FOCUS_MIN = 0.4, FOCUS_REGEN = 0.3, FOCUS_DELAY =
 export const CLASSES = {
   KNIGHT: { name: 'Knight', hp: 140, speed: 183, energy: 100, basicDmg: 1, skillDmg: 1.1, color: '#e6c36a', desc: 'Wide sword sweeps. Hold to charge a huge sweep; full charge releases a shockwave.', dash: { speed: 1000, time: 0.12, cd: 1.15 }, hpRegen: 1.2 },
   RANGER: { name: 'Ranger', hp: 105, speed: 196, energy: 70, basicDmg: 1.1, skillDmg: 1.15, color: '#7fd18b', desc: 'Rapid arrows. Hold to charge: time briefly slows (limited Focus); 75%+ charge pierces one extra enemy.', dash: { speed: 850, time: 0.1, cd: 1.35 }, hpRegen: 0.3 },
+  // lab: tướng đang thử, chỉ chọn được trong Test Lab
+  AXIOM:  { lab: true, name: 'Axiom (test)', hp: 115, speed: 192, energy: 100, basicDmg: 1, skillDmg: 1.1, color: '#a27ae0', desc: 'Wandering swordsman of cubes and space.', dash: { speed: 980, time: 0.12, cd: 1.05 }, hpRegen: 0.6 },
   MAGE:   { name: 'Mage',   hp: 95,  speed: 170, energy: 150, basicDmg: 0.95, skillDmg: 1.05, color: '#9b8cff', desc: 'Arcane orbs. Hold to grow a huge slow orb that refills your energy on hit.', dash: { speed: 920, time: 0.12, cd: 1.25 }, hpRegen: 0.6 }
 };
 export const ENEMIES = {
@@ -164,6 +167,7 @@ export class Sim {
       p.dashT = C.dash.time; p.dashCd = C.dash.cd * (p.dashCdMul || 1); p.inv = C.dash.time + 0.08;
       if (ml > 0) { p.dashX = mx; p.dashY = my; } else { p.dashX = Math.cos(p.aim); p.dashY = Math.sin(p.aim); }
       this.emit('dash', { x: p.x, y: p.y });
+      if (p.cls === 'AXIOM') axiomDash(this);
     }
     const slow = p.charge > 0.12 ? (p.cls === 'KNIGHT' && p.mods && p.mods.relentless ? 1 : 0.5) : (p.swing > 0 ? 0.6 : 1);   // Relentless Blade: tụ lực không bị chậm
     if (p.dashT > 0) { p.dashT -= dt; p.vx = p.dashX * C.dash.speed; p.vy = p.dashY * C.dash.speed; }
@@ -171,7 +175,8 @@ export class Sim {
     p.x += p.vx * dt; p.y += p.vy * dt; this.world.collide(p, p.r);
 
     // tấn công: giữ chuột trái để tụ lực, nhả để đánh; bấm nhanh = đòn thường. Luôn đánh về phía con trỏ.
-    const CH = { KNIGHT: 0.8, RANGER: 1.0, MAGE: 1.2 }[p.cls] / (p.chargeSpd || 1);
+    const CH = { KNIGHT: 0.8, RANGER: 1.0, MAGE: 1.2, AXIOM: 0.9 }[p.cls] / (p.chargeSpd || 1);
+    if (p.cls === 'AXIOM') axiomTick(this, dt, it);
     if (p.echo) { p.echo.t -= dt; if (p.echo.t <= 0) { const E = p.echo; p.echo = null; for (const e of this.enemies) { const d = dist(p.x, p.y, e.x, e.y); if (!e.dead && d < E.reach + e.r && Math.abs(angDiff(Math.atan2(e.y - p.y, e.x - p.x), E.a)) < E.arc / 2 + e.r / Math.max(d, 1)) this.hurtEnemy(e, E.dmg, E.a, 200, 'slash'); } this.emit('swing', { x: p.x, y: p.y, a: E.a, big: true, combo: 3, hits: 1, reach: E.reach, arc: E.arc, charge: 0 }); } }
     p.slowmo = false;
     if (frozen) { p.charge = 0; return; }
@@ -208,6 +213,7 @@ export class Sim {
   damageObs(x, y, r, dmg) { return this.world.damageObstacles(x, y, r, dmg); }
   basicAttack(c) {
     const p = this.p, bm = p.basicMul || 1, as = p.atkSpeed || 1, M = p.mods || {}, sz = M.atkSize || 1;
+    if (p.cls === 'AXIOM') return axiomAttack(this, c);
     if (p.cls === 'KNIGHT') {
       let reach, arc, dmg, kb, big = false;
       if (c === 0) {

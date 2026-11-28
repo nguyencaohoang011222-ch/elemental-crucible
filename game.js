@@ -1,5 +1,6 @@
 // Lõi một lượt chơi: 20 stage, boss ở 5/10/15/20, nâng cấp sau mỗi wave, nâng cấp lớn ở đầu stage 3/7/12/18.
 // Mỗi ô trên thanh là một lõi (chiêu đã ghép sẵn): bấm 1 phím là tung. Ghép lõi trong túi đồ.
+import { mirrorDodge } from './axiom.js';
 import { Sim, ENEMIES, CLASSES, dist, angDiff } from './sim.js';
 import { EL, skillDef, coreDef, coreKey, coreEls, mergeResult, skillPower } from './kits.js';
 import { defaultMods, rollMinor, rollMajor, MINOR_BY_ID } from './upgrades.js';
@@ -231,11 +232,12 @@ export class Game extends Sim {
     // gom input TRƯỚC mọi điều kiện thoát sớm: không bao giờ mất phím vì hit-stop hay khung hình trống
     if (it.slots) for (const s of it.slots) this.inQ.push(typeof s === 'object' ? s.slot : s);
     if (it.dash) this.dashQ = true;
+    if (it.space) this.spaceQ = true;
     if (it.ax !== undefined) this.aim = [it.ax, it.ay];
     if (this.over || this.state !== 'fight') return;
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
     if (this.deathSlow > 0) { this.deathSlow -= dt; dt *= 0.3; }   // boss gục: chậm lại một nhịp
-    let it2 = { ...it, dash: this.dashQ }; this.dashQ = false; frozenInput(this, it2);
+    let it2 = { ...it, dash: this.dashQ, space: !!this.spaceQ }; this.dashQ = false; this.spaceQ = false; frozenInput(this, it2);
     if (this.travel > 0) { const G = this.portal; it2 = G ? { mx: G.x - this.p.x, my: G.y - 30 - this.p.y, ax: G.x, ay: G.y - 60 } : {}; this.inQ = []; this.p.queued = null; }   // đang bước qua cổng
     if (this.p.goldT > 0) { it2 = { ax: it.ax, ay: it.ay }; this.inQ = []; this.p.queued = null; }
     this.t += dt;
@@ -518,6 +520,7 @@ export class Game extends Sim {
   hurtPlayer(dmg, a, opts = {}) {
     if (this._real) { const ph = this.p, R = this._real; if (!opts.real && dist(ph.x, ph.y, R.x, R.y) > 50) return; this.p = R; this._real = null; try { return this.hurtPlayer(dmg, a, opts); } finally { this.p = ph; this._real = R; } }
     const p = this.p; if (p.goldT > 0) { this.emit('goldBlock', { x: p.x, y: p.y }); return; }
+    if (p.cls === 'AXIOM' && p.ax && p.ax.dodgeT > 0) mirrorDodge(this);   // đòn chạm ngay trong nhịp đầu của dash = né gương
     if (p.inv > 0 || this.over || p.leap || this.labGod) return;
     const dm = dmgTakenMul(this, dmg);
     let d = dmg * dm * (opts.boss ? 1 : this.dmgScale) * this.diff.dmg * (1 - p.mods.dr) * (p.giant > 0 ? (p.giantDr || 0.5) : 1) * (p.mods.takenMul || 1);

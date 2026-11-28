@@ -47,3 +47,9 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - `runsave.js`: `Game.finishReward` calls `g.onStageSave(n)` right before `startStage(n)`; `main.js` stores `snapshotRun(g, n)` in the profile as `PR.P.run`, so it goes to localStorage and syncs to the account (Supabase `saves`) like the rest of the profile. `restoreRun` builds a new `Game` from the same seed and enters stage `n`.
 - The save is deleted on death or victory (`showEnd` / `showVictory`) and when a new run starts. Quit to Title from the pause menu keeps it. Training, Test Lab and the trailer never save.
 - When you add new run state to `Game` or `p` (a new counter, a Set), add it to `G_KEYS` / `P_KEYS` in `runsave.js` and to `tests/runsave.mjs`.
+
+## Axiom (experimental hero, Test Lab only)
+
+- `CLASSES.AXIOM.lab` hides it from New Run. Combat logic is in `axiom.js`, sprite and poses in `gfx/axiomrig.js`, effects in `gfx/axiomfx.js`; test `tests/axiom.mjs`.
+- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes. Element skills temporarily reuse the Knight kit.
+- Not done yet: Illusion resource, swaps, enemy infighting, screen-shatter death cheat, style rank, the two cube ultimates, own 16 skills, portrait / diorama / skins, run save of `p.ax`.

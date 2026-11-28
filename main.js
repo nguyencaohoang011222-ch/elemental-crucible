@@ -54,7 +54,7 @@ R.onStep = tk => AU.step(tk);
 let game = new Game(7, 'KNIGHT', { training: true }); // phông nền màn hình chính
 let ui = 'title', runCfg = { cls: 'KNIGHT', element: 'FIRE', difficulty: 'NORMAL' }, isTraining = false, endShown = false;
 const keys = new Set(), mouse = { x: 0, y: 0, down: false, pressed: false, released: false, rdown: false };
-let slotQ = [], dashQ = false, moveTo = null, attackT = null, marker = null; let potQ = null;
+let slotQ = [], dashQ = false, spaceQ = false, moveTo = null, attackT = null, marker = null; let potQ = null;
 // phím chiêu đổi theo kiểu điều khiển: WASD dùng Q E R F, chuột phải dùng Q W E R
 const slotCodes = () => SET.control === 'wasd' ? ['KeyQ', 'KeyE', 'KeyR', 'KeyF'] : ['KeyQ', 'KeyW', 'KeyE', 'KeyR'];
 const slotLabel = i => slotCodes()[i].slice(3);
@@ -62,7 +62,7 @@ const modals = [];
 
 function openModal(id) { if (!modals.includes(id)) modals.push(id); $(id).classList.add('on'); }
 function closeModal(id) { id = id || modals[modals.length - 1]; if (!id) return; $(id).classList.remove('on'); const i = modals.indexOf(id); if (i >= 0) modals.splice(i, 1); }
-function resetInput() { slotQ = []; dashQ = false; moveTo = null; attackT = null; marker = null; mouse.down = mouse.rdown = false; keys.clear(); TM.resetTouch(); }
+function resetInput() { slotQ = []; dashQ = false; spaceQ = false; moveTo = null; attackT = null; marker = null; mouse.down = mouse.rdown = false; keys.clear(); TM.resetTouch(); }
 function ensureAudio() { AU.ensure(); }
 addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensureAudio);
 
@@ -99,6 +99,7 @@ function startLab(cfg) {
   game = new Game((Date.now() % 1e6) | 0, cfg.cls, { training: true, lab: true, theme: cfg.theme, skin: PR.skinOf(cfg.cls), skinFx: PR.skinFx(cfg.cls, PR.skinOf(cfg.cls)) });
   Object.assign(game, keep);
   enterPlay(); showLab(true);
+  if (cfg.cls === 'AXIOM') showHint('Axiom: release a full charge while the square closes to leave a cut. ' + (TM.touchOn() ? 'Tap the cube button' : 'Press Shift') + ' to fold. Dash at the last moment to mirror-dodge.', 9);
 }
 initLab({ game: () => game, cfg: () => labCfg, restart: c => startLab(c), R, openBag: () => openBag(), hint: (s) => showHint(s, 3), resetProfile: () => { PR.reset(); showHint('Profile reset', 2); } });
 // dải chiêu Test Lab: kéo thẳng lên ô nào trên thanh chiêu thì thay ô đó
@@ -560,7 +561,7 @@ function renderNewRun() {
   $('st1').classList.toggle('on', nrStep === 1); $('st2').classList.toggle('on', nrStep === 2);
   $('nrnext').textContent = nrStep === 1 ? 'Next' : 'Begin the run'; $('nrnext').classList.toggle('pulse', nrStep === 2);
   const H = $('heroes'); H.innerHTML = '';
-  for (const k of Object.keys(CLASSES)) {
+  for (const k of Object.keys(CLASSES).filter(k => !CLASSES[k].lab)) {
     const c = CLASSES[k], b = document.createElement('div'), forms = KITS[k].forms;
     b.className = 'hcard' + (k === nrCls ? ' on' : '') + (nrOpen === k ? ' open' : ''); b.tabIndex = 0; b.setAttribute('role', 'button'); b.style.setProperty('--c', c.color);
     const bar = (ic, v, max, label) => '<div class="hstat">' + HICO[ic] + '<div class="hb"><i style="width:' + Math.round(v / max * 100) + '%"></i></div><span>' + label + '</span></div>';
@@ -861,6 +862,7 @@ addEventListener('keydown', e => {
   keys.add(e.code);
   const si = slotCodes().indexOf(e.code); if (si >= 0) slotQ.push(si);
   if (e.code === 'Space') dashQ = true;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') spaceQ = true;   // Axiom: Gập
   if (e.code === 'Digit1') potQ = 'hp'; if (e.code === 'Digit2') potQ = 'en';
   if (e.code === 'KeyT') openSmith();
   if (e.code === 'Tab' || e.code === 'KeyI') openBag();
@@ -1026,7 +1028,7 @@ function frame(now, manual) {
       if (kx || ky || wasd) { moveTo = null; attackT = null; }
       if (mouse.rdown && !attackT) moveTo = { x: wm.x, y: wm.y };
       const it = { mx: kx, my: ky, ax: wm.x, ay: wm.y, cx: wm.x, cy: wm.y };
-      const range = p.cls === 'KNIGHT' ? 64 : p.cls === 'RANGER' ? 330 : 290;
+      const range = p.cls === 'KNIGHT' || p.cls === 'AXIOM' ? 64 : p.cls === 'RANGER' ? 330 : 290;
       let autoFire = false;
       if (attackT && (attackT.dead || !game.enemies.includes(attackT))) attackT = null;
       if (attackT) { const d = Math.hypot(attackT.x - p.x, attackT.y - p.y) - (attackT.r || 16); it.ax = attackT.x; it.ay = attackT.y; if (d > range) { it.mx = attackT.x - p.x; it.my = attackT.y - p.y; } else autoFire = true; }
@@ -1039,7 +1041,8 @@ function frame(now, manual) {
         if (steps === 0) {
           it.slots = slotQ.splice(0); it.potion = potQ; potQ = null;
           if (dashQ) { it.dash = true; if (TM.touchOn()) { const d = TM.dashDir(game); it.mx = d.x; it.my = d.y; } else if (!(wasd && (kx || ky))) { it.mx = wm.x - p.x; it.my = wm.y - p.y; } moveTo = null; dashQ = false; }
-        } else { it.slots = []; it.dash = false; it.fireReleased = false; it.potion = null; }
+          it.space = spaceQ; spaceQ = false;
+        } else { it.space = false; it.slots = []; it.dash = false; it.fireReleased = false; it.potion = null; }
         game.step(1 / 60, it); acc -= 1 / 60; steps++;
         if (game.state === 'reward' || game.over) break;
       }
@@ -1070,7 +1073,7 @@ window.__ea = {
   trailer: { start: (record, extra) => runTrailer(record, extra), time: trailerTime, audio: renderTrailerAudio, music: renderTrailerMusic, clips: trailerClipList }
 };
 requestAnimationFrame(frame);
-TM.initMobile({ SET, game: () => game, slot: i => { if (ui === 'play' && !modals.length) slotQ.push(i); }, dash: () => { if (ui === 'play' && !modals.length) dashQ = true; }, potion: k => { if (ui === 'play' && !modals.length) potQ = k; } });
+TM.initMobile({ SET, game: () => game, slot: i => { if (ui === 'play' && !modals.length) slotQ.push(i); }, dash: () => { if (ui === 'play' && !modals.length) dashQ = true; }, space: () => { if (ui === 'play' && !modals.length) spaceQ = true; }, potion: k => { if (ui === 'play' && !modals.length) potQ = k; } });
 syncControl();
 if (!document.documentElement.requestFullscreen) document.querySelectorAll('[data-act="fullscreen"]').forEach(b => b.classList.add('hidden'));   // iPhone Safari: không có API toàn màn hình
 
