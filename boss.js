@@ -552,9 +552,19 @@ export function bossUpdate(g, b, dt) {
   // tiến lại + chọn đòn
   const d = dist(b.x, b.y, p.x, p.y), toP = aimAt(b, p); b.face = toP;
   const sp = b.def.speed * spd * (1 - (g.brutal ? 0 : b.slowAmt || 0) * 0.3);
-  if (d > b.def.range) { b.x += Math.cos(toP) * sp * dt; b.y += Math.sin(toP) * sp * dt; }
-  else if (b.def.range > 250 && d < 200) { b.x -= Math.cos(toP) * sp * dt; b.y -= Math.sin(toP) * sp * dt; }
+  // đi vòng vật cản: đường thẳng bị chặn thì lệch dần sang một bên (giữ phía đã chọn để không lắc qua lại); kẹt lâu thì ra đòn ngay thay vì đứng dí tường
+  const bx0 = b.x, by0 = b.y, want = d > b.def.range ? toP : (b.def.range > 250 && d < 200) ? toP + Math.PI : null;
+  if (want !== null) {
+    const R = b.r * 0.8, look = Math.max(40, b.r * 0.9), free = a => !g.world.blocked(b.x + Math.cos(a) * look, b.y + Math.sin(a) * look, R);
+    let dir = want;
+    if (!free(want)) { const s0 = b.detour || (g.rand() < 0.5 ? 1 : -1); dir = null;
+      for (const k of [0.5, 0.9, 1.3, 1.75]) { for (const s of [s0, -s0]) if (free(want + s * k)) { dir = want + s * k; b.detour = s; break; } if (dir !== null) break; }
+      if (dir === null) dir = want; b.detourT = 0.6; }
+    else if (b.detourT > 0) { b.detourT -= dt; if (b.detourT <= 0) b.detour = 0; }
+    b.x += Math.cos(dir) * sp * dt; b.y += Math.sin(dir) * sp * dt;
+  }
   g.world.collide(b, b.r * 0.8);
+  if (want !== null) { const moved = Math.hypot(b.x - bx0, b.y - by0); b.stuckT = moved < sp * dt * 0.25 ? (b.stuckT || 0) + dt : 0; if (b.stuckT > 1.0) { b.stuckT = 0; b.idle = Math.min(b.idle, 0); b.detour = -(b.detour || 1); } }
   { const rp = g._real || p; if (dist(b.x, b.y, rp.x, rp.y) < b.r + rp.r + 4 && b.contactCd <= 0) { b.contactCd = 1; g.hurtPlayer(15 * b.def.dmg, aimAt(b, rp), { boss: true, real: true }); } }
   b.idle -= dt;
   if (b.idle <= 0) {
