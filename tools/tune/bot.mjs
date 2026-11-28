@@ -2,6 +2,13 @@
 // level: 'base' (bot gốc, giữ nguyên kết quả cũ), 'novice' (phản xạ chậm, né kém), 'good' (né sớm, ưu tiên chiêu hiệu quả theo bảng đo).
 import { Game, BOSS_STAGES } from '../../game.js';
 import * as FG from '../../forge.js';
+import { skillPower } from '../../kits.js';
+import { RELIC_BY_ID } from '../../relics.js';
+
+// strategy: 'merge' (mặc định: ghép tham lam) | 'spam' (giữ chiêu đơn, spam chiêu hiệu quả nhất, nhặt nâng cấp hồi máu/mana: kiểu người chơi thật đã phá đảo)
+const SPAM_PICKS = ['leech', 'regen', 'surge', 'flow', 'power', 'focus', 'fire', 'water', 'earth', 'wind', 'reserve', 'vital'];
+const spamValue = (g, c) => { const sk = g.coreSkill(c); return skillPower(sk) / Math.max(1, sk.cost); };
+const ready = (g, c) => { const p = g.p, sk = g.coreSkill(c); return p.energy >= sk.cost && !(p.cds && p.cds[sk.key] > 0); };
 
 // ghé lò rèn (bot không đi bộ tới: coi như ghé một lần mỗi stage có nhà): rèn chiêu mạnh nhất trên thanh, mua bình, phần dư mua chỉ số
 export function shop(g) {
@@ -43,6 +50,8 @@ export function bot(g, skill, cfg = {}) {
   }
   for (const f of g.foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < 90) { mx += -f.vy * push; my += f.vx * push; if (d < 40 * look) danger = true; } }
   if (g.boss && g.boss.dashing && bd < 220) danger = true;
+  // novice/good: nhặt đồ rơi gần (mana, máu, chỉ số) khi không có nguy hiểm, như người chơi thật
+  if (level !== 'base' && !danger && g.pickups) { let pk = null, pd = 350; for (const q of g.pickups) { if (q.kind === 'gold' || q.kind === 'gem' || q.kind === 'bshard' || (q.kind === 'energy' && p.energy > p.energyMax * 0.85) || (q.kind === 'heal' && p.hp > p.max * 0.9)) continue; const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < pd) { pd = d; pk = q; } } if (pk) { mx = (pk.x - p.x) * 4 + mx * 0.3; my = (pk.y - p.y) * 4 + my * 0.3; } }
   it.mx = mx; it.my = my; it.ax = tgt.x; it.ay = tgt.y; it.cx = tgt.x; it.cy = tgt.y; it.fire = bd < range + 40;
   if (p.cls === 'AXIOM') it.fireHeld = it.fire;
   it.dash = danger || foes.some(e => e.state === 'charge' && Math.hypot(e.x - p.x, e.y - p.y) < 140);
@@ -52,7 +61,8 @@ export function bot(g, skill, cfg = {}) {
   if (!skill || g.t % 0.25 > 1 / 60) return it;
   // dùng chiêu: ưu tiên chiêu 3 nguyên tố, rồi ô ngẫu nhiên đủ energy (mỗi ô 1 phím). good: chọn ô có điểm hiệu quả cao nhất.
   const opts = [];
-  for (let i = 0; i < 4; i++) { const c = p.cores[i]; if (c && p.energy >= g.coreSkill(c).cost) opts.push([i, c]); }
+  for (let i = 0; i < 4; i++) { const c = p.cores[i]; if (c && ready(g, c)) opts.push([i, c]); }
+  if (cfg.strategy === 'spam') { if (opts.length) { let bi = opts[0][0], bv = -1; for (const [i, c] of opts) { const v = spamValue(g, c); if (v > bv) { bv = v; bi = i; } } it.slots = [bi]; } return it; }
   const big = opts.find(([, c]) => c.type === 'tri' || c.type === 'inf');
   if (big) it.slots = [big[0]];
   else if (opts.length && level === 'good' && cfg.value) { let bi = opts[0][0], bv = -1; for (const [i, c] of opts) { const v = cfg.value(g, c); if (v > bv) { bv = v; bi = i; } } it.slots = [bi]; }
@@ -60,10 +70,11 @@ export function bot(g, skill, cfg = {}) {
   return it;
 }
 // ghép tham lam trong túi: 3 đơn khác nhau → tuyệt kỹ, đôi + đơn → truyền, 2 đơn khác nhau → đôi
-export function autoMerge(g, level) {
+export function autoMerge(g, level, strategy) {
   const inv = g.p.cores, idx = f => inv.map((c, i) => c && f(c) ? i : -1).filter(i => i >= 0);
   // 'full' (thử nghiệm): giữ thanh chiêu đầy 4 ô, chỉ ghép khi có hơn 4 lõi. Đo thấy ghép tham lam mạnh hơn nên good vẫn ghép.
   const count = () => inv.filter(Boolean).length;
+  if (strategy === 'spam') { const v = c => c ? spamValue(g, c) : -1; const sorted = inv.slice().sort((a, b) => v(b) - v(a)); for (let i = 0; i < inv.length; i++) inv[i] = sorted[i]; return; }   // spam: không ghép, chiêu đơn mạnh nhất lên thanh
   for (let guard = 0; guard < 6; guard++) {
     if (level === 'full' && count() <= 4) break;
     const singles = idx(c => c.type === 'el'), duos = idx(c => c.type === 'duo');
@@ -79,29 +90,31 @@ export function autoMerge(g, level) {
   const order = inv.map((c, i) => i).sort((a, b) => rank(inv[b]) - rank(inv[a]));
   const sorted = order.map(i => inv[i]); for (let i = 0; i < inv.length; i++) inv[i] = sorted[i];
 }
-export function rewards(g, level) {
+export function rewards(g, level, strategy) {
   while (g.state === 'reward') {
     const r = g.rewards[0];
-    if (r.type === 'minor') { if (!r.choices.length) g.finishReward(); else g.pickMinor(r.choices[Math.floor(g.rand() * r.choices.length)].id); }
+    if (r.type === 'minor') { if (!r.choices.length) g.finishReward(); else { const pref = strategy === 'spam' ? SPAM_PICKS.map(id => r.choices.find(c => c.id === id)).find(Boolean) : null; g.pickMinor((pref || r.choices[Math.floor(g.rand() * r.choices.length)]).id); } }
     else {
       const aw = r.choices.find(c => c.type === 'awaken');
       g.pickMajor(aw || r.choices[0]);
     }
   }
-  autoMerge(g, level);
+  autoMerge(g, level, strategy);
 }
-// một lượt chơi. opts: { difficulty: 'NORMAL'|'HARD', level, shop, value, maxT, immortal (máu luôn đầy: đo sức đánh), maxStage }
+// một lượt chơi. opts: { difficulty: 'NORMAL'|'HARD', level, strategy, relics: [id] (tặng ngay từ đầu), shop, value, maxT, immortal (máu luôn đầy: đo sức đánh), maxStage, onStep(g) }
 export function run(cls, el, seed, skill = true, opts = {}) {
   const SHOP = opts.shop !== false;
   const g = new Game(seed, cls, { element: el, difficulty: opts.difficulty }); const dt = 1 / 60; let bossTimes = {}, bossStart = 0;
-  const cfg = { level: opts.level || 'base', seed, shop: SHOP, value: opts.value, look: opts.look, push: opts.push, dashMiss: opts.dashMiss };
+  const cfg = { level: opts.level || 'base', seed, shop: SHOP, value: opts.value, look: opts.look, push: opts.push, dashMiss: opts.dashMiss, strategy: opts.strategy || 'merge' };
+  for (const id of opts.relics || []) { const r = RELIC_BY_ID[id]; if (!r || (r.cls && r.cls !== cls)) continue; (g.p.relics = g.p.relics || new Set()).add(id); r.apply(g.p.mods, g); g.refreshStats(false); }
   // sát thương nhận theo nguồn (chỉ đo trong công cụ, không đổi game)
   const taken = { mob: 0, boss: 0 }, stageT = {}; let stT0 = 0, lastSt = g.stage;
   const hp0 = g.hurtPlayer.bind(g); g.hurtPlayer = function (...a) { const q = this.p, h = q.hp; const r = hp0(...a); const d = Math.max(0, h - q.hp); if (d) taken[this.boss && !this.boss.dead ? 'boss' : 'mob'] += d; return r; };
   const maxT = opts.maxT || 4500;
   while (!g.over && g.t < maxT && !(opts.maxStage && g.stage > opts.maxStage)) {
-    if (opts.immortal) g.p.hp = g.p.max;
-    if (g.state === 'reward') { if (bossStart) { bossTimes[g.stage] = Math.round(g.t - bossStart); bossStart = 0; } rewards(g, cfg.level); continue; }
+    if (opts.immortal && !(opts.mortalFrom && g.stage >= opts.mortalFrom)) g.p.hp = g.p.max;
+    if (opts.onStep && opts.onStep(g) === false) break;
+    if (g.state === 'reward') { if (bossStart) { bossTimes[g.stage] = Math.round(g.t - bossStart); bossStart = 0; } rewards(g, cfg.level, cfg.strategy); continue; }
     const st = g.stage;
     if (SHOP && g.forge && g.shopped !== st) { g.shopped = st; shop(g); }
     if (BOSS_STAGES[st] !== undefined && !bossStart) bossStart = g.t;
