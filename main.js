@@ -1124,7 +1124,7 @@ function frame(now, manual) {
           if (dashQ) { it.dash = true; if (TM.touchOn()) { const d = TM.dashDir(game); it.mx = d.x; it.my = d.y; } else if (!(wasd && (kx || ky))) { it.mx = wm.x - p.x; it.my = wm.y - p.y; } moveTo = null; dashQ = false; }
           it.space = spaceQ; spaceQ = false;
         } else { it.space = false; it.slots = []; it.dash = false; it.fireReleased = false; it.potion = null; }
-        game.step(1 / 60, it); acc -= 1 / 60; steps++;
+        { const t0 = performance.now(); game.step(1 / 60, it); R.simMs = (R.simMs || 0) * 0.9 + (performance.now() - t0) * 0.1; } acc -= 1 / 60; steps++;   // F3: đo cả thời gian mô phỏng
         if (game.state === 'reward' || game.over) break;
       }
       if (steps) { mouse.pressed = false; mouse.released = false; }

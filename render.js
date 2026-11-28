@@ -408,7 +408,7 @@ export class Renderer {
     this.screenTexts(S, sim, dt);
     this.overlay(S, sim, dt);
     this.ms = this.ms * 0.9 + (performance.now() - t0) * 0.1; if (dt > 0) this.fps = this.fps * 0.94 + (1 / dt) * 0.06;
-    if (this.opts.fps) { S.font = 'bold 12px monospace'; S.textAlign = 'left'; S.fillStyle = '#000a'; S.fillRect(8, H - 26, 210, 18); S.fillStyle = this.fps > 55 ? '#9dff9d' : this.fps > 40 ? '#ffe27a' : '#ff6a6a'; S.fillText(`FPS ${Math.round(this.fps)} · draw ${this.ms.toFixed(1)}ms · ${this.bw}x${this.bh}`, 12, H - 13); }
+    if (this.opts.fps) { S.font = 'bold 12px monospace'; S.textAlign = 'left'; S.fillStyle = '#000a'; S.fillRect(8, H - 26, 300, 18); S.fillStyle = this.fps > 55 ? '#9dff9d' : this.fps > 40 ? '#ffe27a' : '#ff6a6a'; S.fillText(`FPS ${Math.round(this.fps)} · draw ${this.ms.toFixed(1)}ms · sim ${(this.simMs || 0).toFixed(2)}ms · ${this.bw}x${this.bh}`, 12, H - 13); }
   }
   collectLights(sim, L) {
     const p = sim.p;
