@@ -81,6 +81,8 @@ export const CD = { scale: 0.45 };
 export const RESONANCE = { t: 5, fire: 0.2, waterHeal: 0.04, earthShield: 0.15, windSpeed: 0.2, windCd: 2 };
 // ULTFX: đặc sản tuyệt kỹ dùng chung (dấu nhận thêm sát thương có trần trên boss, ngưỡng kết liễu)
 export const ULTFX = { bossVulnCap: 0.15, execAt: 0.3 };
+// BURN: sát thương thiêu đốt mỗi 0,5 s (cố định, không theo sức chiêu: chiêu lửa nào cũng đốt như nhau)
+export const BURN = { mob: 4.3, boss: 10 };
 export const COST = { flat: 7, perCd: 3.4, tier: [1.15, 1, 1] };
 export const BRUTAL = { count: 1.35, aggro: 1.4, elite: 0.55, bossWind: 0.78, bossIdle: 0.55, bossSpeed: 1.15, link: 0.25, twinSpread: 0.2 };
 export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
@@ -727,7 +729,7 @@ export class Game extends Sim {
       e.burn = Math.max(0, e.burn - dt); e.wet = Math.max(0, e.wet - dt); e.slow = Math.max(0, e.slow - dt); if (e.slow <= 0) e.slowAmt = 0;
       if (e.frozeHit > 0) e.frozeHit -= dt;
       e.root = Math.max(0, e.root - dt); e.freeze = Math.max(0, e.freeze - dt); e.stun = Math.max(0, e.stun - dt); e.blind = Math.max(0, e.blind - dt); e.rootImm = Math.max(0, e.rootImm - dt);
-      if (e.burn > 0) { e.burnTick -= dt; if (e.burnTick <= 0) { e.burnTick = 0.5; this.hurtEnemy(e, (e.boss ? 10 : 5) * this.p.mods.dmg * (this.p.mods.elDmg.FIRE || 1), 0, 0, 'burn'); } }
+      if (e.burn > 0) { e.burnTick -= dt; if (e.burnTick <= 0) { e.burnTick = 0.5; this.hurtEnemy(e, (e.boss ? BURN.boss : BURN.mob) * this.p.mods.dmg * (this.p.mods.elDmg.FIRE || 1), 0, 0, 'burn'); } }
       if (!e.boss) for (const w of this.walls) { const s = segDist(e.x, e.y, w), r = e.r + 8; if (s.d < r) { e.x += s.nx * (r - s.d); e.y += s.ny * (r - s.d); } }
     }
     const dummies = [], bosses = [], minions = [];
