@@ -5,7 +5,15 @@ import { WPP, sn } from './pixel.js';
 const H = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 // đĩa pixel: các hàng ô bám lưới
 export function disc(ctx, x, y, r, c) { ctx.fillStyle = c; const X = sn(x), Y = sn(y); ctx.beginPath(); for (let dy = -r; dy <= r; dy += WPP) { const w = sn(Math.sqrt(Math.max(0, r * r - dy * dy))); if (w > 0) ctx.rect(X - w, Y + sn(dy), w * 2, WPP); } ctx.fill(); }
-const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)); ctx.fillStyle = c; ctx.fillRect(sn(x - z / 2), sn(y - z / 2), z, z); };
+// ô pixel: gom theo (màu, độ mờ) rồi vẽ một path cho mỗi nhóm khi hàm hiệu ứng kết thúc (trước đây mỗi ô là một lệnh fillRect: một nhát chém ~900 lệnh/khung)
+const SQB = new Map();
+const sq = (ctx, x, y, s, c) => { const z = Math.max(WPP, sn(s)), k = c + '|' + ctx.globalAlpha; let b = SQB.get(k); if (!b) SQB.set(k, b = { c, a: ctx.globalAlpha, v: [] }); b.v.push(sn(x - z / 2), sn(y - z / 2), z); };
+function flushSq(ctx) {
+  if (!SQB.size) return; const ga = ctx.globalAlpha;
+  for (const b of SQB.values()) { if (!b.v.length) continue; ctx.globalAlpha = b.a; ctx.fillStyle = b.c; ctx.beginPath(); const v = b.v; for (let i = 0; i < v.length; i += 3) ctx.rect(v[i], v[i + 1], v[i + 2], v[i + 2]); ctx.fill(); }
+  SQB.clear(); ctx.globalAlpha = ga;
+}
+const batched = (f, ci) => (...a) => { try { return f(...a); } finally { flushSq(a[ci]); } };
 
 // bộ màu theo nguyên tố của từng boss: [viền tối, giữa, sáng, rất sáng, lõi]
 export const STY = {
@@ -52,7 +60,7 @@ function stampPath(ctx, pts, s, c, dash = 0, off = 0) {
 function fillPath(ctx, pts, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.fill(); }
 
 // vùng cảnh báo hình tròn / quạt / đường / chữ nhật trước khi đánh
-export function telegraph(ctx, h, t) {
+function telegraph_(ctx, h, t) {
   const span = Math.max(0.01, h.T - h.hold), pr = Math.min(1, (h.T - h.t) / span), flash = h.t < 0.15, blink = flash && Math.floor(t * 30) % 2 === 0;
   const qk = styleOf(h) === STY.quake, c = qk ? '#F59E0B' : h.color || '#ff5a4a', out = outlinePts(h, 1);
   fillPath(ctx, out, blink ? 'rgba(255,255,255,.32)' : qk ? 'rgba(217,119,6,.16)' : 'rgba(255,50,50,.18)');
@@ -72,7 +80,7 @@ function muzzle(ctx, x, y, st, t, k = 1) {
   disc(ctx, x, y, 15 * p * k, B[0]); disc(ctx, x, y, 12 * p * k, B[1]); disc(ctx, x, y, 8 * p * k, B[3]); disc(ctx, x, y, 4 * k + 2, B[4]);
   for (let i = 0; i < 8; i++) { const q = t * 3 + i * 0.785, r = 22 * k; sq(ctx, x + Math.cos(q) * r, y + Math.sin(q) * r, WPP * (i % 2 ? 1 : 2), B[i % 2 ? 2 : 3]); } // vòng phù văn
 }
-export function beam(R, ctx, h, t) {
+function beam_(R, ctx, h, t) {
   const st = styleOf(h), K = kindOf(st), B = st.band, r0 = r0Of(h), W = h.width;
   for (let k = 0; k < h.n; k++) {
     const a = h.twin ? h.a + (k - (h.n - 1) / 2) * h.twin : h.a + k * Math.PI * 2 / h.n, ca = Math.cos(a), sa = Math.sin(a), O = h.vo && h.vo[k];
@@ -124,7 +132,7 @@ export function beam(R, ctx, h, t) {
 }
 
 // ---------- sóng xung kích đang lan ----------
-export function shockwave(R, ctx, h, t) {
+function shockwave_(R, ctx, h, t) {
   const st = styleOf(h), K = kindOf(st), B = st.band, gs = null, T2 = Math.max(12, h.thick), r = h.rr, tf = Math.floor(t * 20);
   if (r <= 0) return;
   const n = Math.max(32, Math.floor(r * 6.283 / (WPP * 2)));
@@ -151,7 +159,7 @@ export function shockwave(R, ctx, h, t) {
 }
 
 // ---------- đòn vừa đánh xong (quét / đập / đường) ----------
-export function impact(R, ctx, h, t) {
+function impact_(R, ctx, h, t) {
   const st = styleOf(h), K = kindOf(st), B = st.band, k = Math.max(0, h.fade / 0.3), tf = Math.floor(t * 20);
   if (!h._fx) { h._fx = true; impactBurst(R, h, st, K); }
   ctx.globalAlpha = Math.min(1, k * 1.4);
@@ -200,7 +208,7 @@ function impactBurst(R, h, st, K) {
 }
 
 // hố đen (Storm Sovereign): xoắn ốc ô vuông hút vào tâm
-export function vortex(R, ctx, h, t) {
+function vortex_(R, ctx, h, t) {
   const k0 = h.active ? 1 : 1 - h.t / h.T, st = STY.storm, B = st.band;
   ctx.globalAlpha = 0.22 * k0; disc(ctx, h.x, h.y, h.r * 0.25, '#1a0a2a'); ctx.globalAlpha = 1;
   for (let i = 0; i < 5; i++) {
@@ -214,7 +222,7 @@ export function vortex(R, ctx, h, t) {
 }
 
 // NGỌN LỬA CUỐI CÙNG: phủ đỏ toàn đấu trường, vùng bóng sau mỏm đá (so với rồng) tô tối viền vàng = chỗ an toàn
-export function shadowblast(R, ctx, h, sim, t) {
+function shadowblast_(R, ctx, h, sim, t) {
   if (h.done) { const k = Math.max(0, h.fade / 0.6); ctx.globalAlpha = k * 0.6; disc(ctx, h.x, h.y, h.r, '#fff3c0'); ctx.globalAlpha = 1; return; }
   const pr = 1 - h.t / h.T, flash = h.t < 0.15 && Math.floor(t * 30) % 2 === 0, B = STY.fire.band;
   ctx.globalAlpha = 0.16 + pr * 0.22; disc(ctx, h.x, h.y, h.r, flash ? '#ffffff' : '#ff3a10'); ctx.globalAlpha = 1;
@@ -230,3 +238,10 @@ export function shadowblast(R, ctx, h, sim, t) {
     ctx.globalAlpha = 1;
   }
 }
+
+export const telegraph = batched(telegraph_, 0);
+export const beam = batched(beam_, 1);
+export const shockwave = batched(shockwave_, 1);
+export const impact = batched(impact_, 1);
+export const vortex = batched(vortex_, 1);
+export const shadowblast = batched(shadowblast_, 1);

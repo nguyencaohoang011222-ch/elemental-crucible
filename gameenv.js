@@ -246,7 +246,9 @@ export function envStep(g, dt) {
     if (z.kind === 'swamp' && g.rand() < dt * 2) applyEl(g, z.x, z.y, z.r * 0.6, 'WATER', { puddle: true });
   }
   // bẫy trần (dinh thự) / mạch phun (núi lửa)
-  g.mapHz = mapHazards(g.theme, g.world.seed, p.x, p.y, 780).filter(h => !(g.forge && dist(h.x, h.y, g.forge.x, g.forge.y) < 260)); // không có bẫy trong hiên lò rèn
+  // danh sách bẫy chỉ tính lại khi người chơi sang ô 256 đơn vị khác (trước đây quét ~1000 ô mỗi bước); bán kính nới thêm 256 để vẫn phủ đủ
+  { const Q = 256, qx = Math.round(p.x / Q), qy = Math.round(p.y / Q), key = g.theme + ':' + g.stage + ':' + qx + ',' + qy + (g.forge ? 'f' : '');
+    if (g._hzKey !== key) { g._hzKey = key; g.mapHz = mapHazards(g.theme, g.world.seed, qx * Q, qy * Q, 780 + Q).filter(h => !(g.forge && dist(h.x, h.y, g.forge.x, g.forge.y) < 260)); } }   // không có bẫy trong hiên lò rèn
   for (const h of g.mapHz) {
     const ph = (g.t + h.off) % h.period, prev = g.hzPrev.get(h.id);
     g.hzPrev.set(h.id, ph);

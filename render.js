@@ -75,6 +75,8 @@ const BIO = {
 const ELC = el => (EL_INFO[el] || { color: '#ffffff' }).color;
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 
+// trần số hiệu ứng ngắn hạn: bỏ cái cũ nhất khi quá trần (đỡ giật khi có hàng chục quái cháy cùng lúc)
+const FX_CAP = { nums: 60, streaks: 90, rings: 60, slashes: 40 };
 export class Renderer {
   constructor(cv) {
     this.cv = cv; this.ctx = cv.getContext('2d', { alpha: false });   // canvas luôn phủ kín, không cần kênh trong suốt → ghép hình rẻ hơn this.ctx.imageSmoothingEnabled = false;
@@ -288,8 +290,10 @@ export class Renderer {
     this.under(ctx, sim, false);
     // vật thể + nhân vật + cỏ theo trục y
     const list = this._ys || (this._ys = []), RR = Math.max(view.w, view.h) / 2 + 160; list.length = 0;
+    // chỉ lấy vật thể chạm khung nhìn: neo ở chân, sprite mọc lên trên (cao tối đa ~260 đơn vị), nên bỏ cái nằm trên mép trên hoặc quá xa dưới / hai bên
+    const vx0 = view.ox - 140, vx1 = view.ox + view.w + 140, vy0 = view.oy - 30, vy1 = view.oy + view.h + 280;
     sim.world.near(this.camX, this.camY, RR, o => {
-      if (o.hidden) return;
+      if (o.hidden || o.x < vx0 || o.x > vx1 || o.y < vy0 || o.y > vy1) return;
       const spr = this.props.get(tk, T, o);
       if (o.fuse > 0) lights.push({ x: o.x, y: o.y - o.r, r: 90, i: 0.9, c: '#ff5a1a', glow: 0.25 });
       if (o.burning > 0) lights.push({ x: o.x, y: o.y - o.r, r: 110, i: 0.9, c: '#ff7a3c', glow: 0.22 });
@@ -356,7 +360,7 @@ export class Renderer {
       if (!s.thin) { ctx.globalAlpha *= 0.6; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, s.range, Math.min(a0, a1), Math.max(a0, a1)); ctx.arc(0, 0, s.range - 6, Math.max(a0, a1), Math.min(a0, a1), true); ctx.fill(); }
       ctx.restore();
     }
-    ctx.globalAlpha = 1; this.slashes = this.slashes.filter(s => s.t > 0);
+    ctx.globalAlpha = 1; this.slashes = this.slashes.filter(s => s.t > 0); if (this.slashes.length > FX_CAP.slashes) this.slashes.splice(0, this.slashes.length - FX_CAP.slashes);
     for (const b of this.beams) {
       b.t -= dt; const k2 = Math.max(0, b.t / b.T);
       ctx.save(); ctx.globalAlpha = k2; ctx.strokeStyle = rgba(b.c, 0.5); ctx.lineWidth = b.w * (1.4 - k2 * 0.4); ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
@@ -372,7 +376,7 @@ export class Renderer {
     }
     this.spikes = this.spikes.filter(s => s.t > 0);
     for (const r of this.rings) { r.t -= dt; const pr = 1 - r.t / r.T; ctx.strokeStyle = r.c; ctx.globalAlpha = Math.max(0, r.t / r.T); ctx.lineWidth = Math.max(3, r.w || 4); ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(0, r.r + (r.R - r.r) * pr), 0, 7); ctx.stroke(); }
-    ctx.globalAlpha = 1; this.rings = this.rings.filter(r => r.t > 0);
+    ctx.globalAlpha = 1; this.rings = this.rings.filter(r => r.t > 0); if (this.rings.length > FX_CAP.rings) this.rings.splice(0, this.rings.length - FX_CAP.rings);
     if (p.shield > 0) { ctx.strokeStyle = '#e6d29a'; ctx.lineWidth = 3; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(this.time * 8); ctx.beginPath(); ctx.arc(p.x, p.y - 8, 26, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
     // hạt: gom theo (màu, độ mờ làm tròn 1/8) rồi tô mỗi nhóm một lần thay cho một fillRect mỗi hạt
     { const PG = this._pg || (this._pg = new Map()); for (const g of PG.values()) g.n = 0;
@@ -380,7 +384,7 @@ export class Renderer {
       for (const [k, g] of PG) { if (!g.n) { if (PG.size > 64) PG.delete(k); continue; } ctx.globalAlpha = g.a; ctx.fillStyle = g.c; ctx.beginPath(); for (let i = 0; i < g.n * 3; i += 3) ctx.rect(g.r[i], g.r[i + 1], g.r[i + 2], g.r[i + 2]); ctx.fill(); } }
     ctx.globalAlpha = 1; this.parts = this.parts.filter(q => q.life > 0); if (this.parts.length > (this.lowQ ? 260 : 900)) this.parts = this.parts.slice(this.lowQ ? -260 : -900);
     for (const q of this.streaks) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.86; q.vy *= 0.86; ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.strokeStyle = q.c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * 0.03, q.y - q.vy * 0.03); ctx.stroke(); }
-    ctx.globalAlpha = 1; this.streaks = this.streaks.filter(q => q.life > 0);
+    ctx.globalAlpha = 1; this.streaks = this.streaks.filter(q => q.life > 0); if (this.streaks.length > FX_CAP.streaks) this.streaks.splice(0, this.streaks.length - FX_CAP.streaks);
     for (const b of this.bolts) { b.t -= dt; const k2 = b.t / b.T; ctx.globalAlpha = Math.min(1, k2 * 2); for (const [w2, c2] of [[7, 'rgba(120,200,255,.55)'], [3, '#ffffff']]) { ctx.strokeStyle = c2; ctx.lineWidth = w2; ctx.beginPath(); b.segs.forEach(([x2, y2], i) => i ? ctx.lineTo(x2, y2) : ctx.moveTo(x2, y2)); ctx.stroke(); } }
     ctx.globalAlpha = 1; this.bolts = this.bolts.filter(b => b.t > 0);
     for (const q of this.stars) { q.t -= dt; const k2 = q.t / q.T, L = sn(10 + 26 * k2); ctx.fillStyle = '#ffffff'; ctx.fillRect(sn(q.x) - L, sn(q.y) - 3, L * 2, 6); ctx.fillRect(sn(q.x) - 3, sn(q.y) - L, 6, L * 2); ctx.fillStyle = '#ffe27a'; ctx.fillRect(sn(q.x) - 6, sn(q.y) - 6, 12, 12); }
@@ -439,7 +443,7 @@ export class Renderer {
     for (const q of this.texts) { const [x, y] = this.toScreen(q.x, q.y); S.font = `bold ${Math.round(q.size * f)}px "Pixelify Sans",monospace`; S.lineWidth = 3; S.strokeStyle = '#000a'; S.strokeText(q.s, x, y); S.fillStyle = q.c; S.fillText(q.s, x, y); }
     this.texts.length = 0;
     for (const n of this.nums) { n.t -= dt; const pr = 1 - n.t / n.T, [x, y] = this.toScreen(n.x, n.y - pr * 26); S.globalAlpha = Math.max(0, Math.min(1, n.t / (n.T * 0.4))); S.font = `bold ${Math.round((n.big ? 18 : 13) * f)}px "Pixelify Sans",monospace`; S.lineWidth = 3; S.strokeStyle = '#000a'; S.strokeText(n.s, x, y); S.fillStyle = n.c || '#fff'; S.fillText(n.s, x, y); }
-    S.globalAlpha = 1; this.nums = this.nums.filter(n => n.t > 0);
+    S.globalAlpha = 1; this.nums = this.nums.filter(n => n.t > 0); if (this.nums.length > FX_CAP.nums) this.nums.splice(0, this.nums.length - FX_CAP.nums);
     if (this.castText) { const c = this.castText; c.t -= dt; const pr = 1 - c.t / c.T, [x, y] = this.toScreen(p.x, p.y - 58 - pr * 14); S.globalAlpha = Math.max(0, Math.min(1, c.t / (c.T * 0.4))); S.font = `bold ${Math.round(18 * f)}px "Pixelify Sans",monospace`; S.lineWidth = 4; S.strokeStyle = '#000a'; const label = c.s + (c.first ? '  NEW!' : ''); S.strokeText(label, x, y); S.fillStyle = c.c; S.fillText(label, x, y); S.globalAlpha = 1; if (c.t <= 0) this.castText = null; }
   }
   drawGround(ctx, sim, view, tk, T) {
@@ -475,8 +479,9 @@ export class Renderer {
     ctx.globalAlpha = 1;
     this.forgeOverlay(ctx, sim, W, H);
     this.gateOverlay(ctx, sim, W, H);
-    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.6);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, sim.boss ? 'rgba(20,0,0,.45)' : 'rgba(0,0,0,.28)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // vignette: gradient chỉ tạo lại khi đổi kích thước màn hình hoặc vào/ra trận boss
+    const vk = W + 'x' + H + (sim.boss ? 'b' : ''); if (this._vigK !== vk) { this._vigK = vk; const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.6); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, sim.boss ? 'rgba(20,0,0,.45)' : 'rgba(0,0,0,.28)'); this._vig = g; }
+    ctx.fillStyle = this._vig; ctx.fillRect(0, 0, W, H);
     SKV.screen(this, ctx, sim, dt, W, H);
     if (sim.timeScale && sim.timeScale < 1 && !this._skSlowmo) { ctx.fillStyle = 'rgba(80,140,255,.12)'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = 'rgba(160,200,255,.35)'; ctx.lineWidth = 10; ctx.strokeRect(0, 0, W, H); }
     if (this.axShat || this.axStopK > 0 || (p.ax && p.ax.stop)) axiomScreen(this, ctx, W, H, dt, sim);
