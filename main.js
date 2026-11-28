@@ -32,6 +32,7 @@ import { smithSprite } from './gfx/forge.js';
 import { snapshotRun, restoreRun, validRun } from './runsave.js';
 import { initCoop, openCoop, coopTick, queueCmd, CO, leave as leaveCoop } from './coop.js';
 import * as SU from './seasonui.js';
+import * as GD from './guidedemo.js';
 
 const $ = id => document.getElementById(id);
 const cv = $('c'), R = new Renderer(cv);
@@ -64,7 +65,7 @@ const slotLabel = i => slotCodes()[i].slice(3);
 const modals = [];
 
 function openModal(id) { if (!modals.includes(id)) modals.push(id); $(id).classList.add('on'); }
-function closeModal(id) { id = id || modals[modals.length - 1]; if (!id) return; $(id).classList.remove('on'); const i = modals.indexOf(id); if (i >= 0) modals.splice(i, 1); }
+function closeModal(id) { id = id || modals[modals.length - 1]; if (!id) return; if (id === 'controls') GD.stopDemo(); $(id).classList.remove('on'); const i = modals.indexOf(id); if (i >= 0) modals.splice(i, 1); }
 function resetInput() { slotQ = []; dashQ = false; spaceQ = false; moveTo = null; attackT = null; marker = null; mouse.down = mouse.rdown = false; keys.clear(); TM.resetTouch(); }
 function ensureAudio() { AU.ensure(); }
 addEventListener('pointerdown', ensureAudio); addEventListener('keydown', ensureAudio);
@@ -536,72 +537,116 @@ for (const id of ['ctlbtn', 'ctlhud']) $(id).onclick = e => { e.stopPropagation(
 function syncControl() { for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.classList.toggle('on', x.dataset.c === SET.control); qw.dataset.sig = '';
   { const t = SET.control === 'touch', html = PXI(t ? 'phone' : 'keyboard', 16) + '<span>' + (t ? 'Mobile' : 'PC') + '</span>'; for (const id of ['ctlbtn', 'ctlhud']) { const b = $(id); b.innerHTML = html; b.title = 'Controls: ' + (t ? 'Mobile' : 'PC') + ' (tap to switch)'; } } document.body.classList.toggle('touch', SET.control === 'touch'); TM.markTouchDirty(); TM.resetTouch(); }
 for (const seg of document.querySelectorAll('.ctlseg')) for (const x of seg.children) x.onclick = () => { if (x.dataset.c !== 'touch') SET.lastDesk = x.dataset.c; SET.control = x.dataset.c; saveSet(); syncControl(); moveTo = attackT = null; };
-function renderControls() {
-  if (TM.touchOn()) return renderGuide([['<kbd>Left side</kbd>', 'Touch anywhere on the left half and drag: a joystick appears under your thumb.'], ['<kbd>Big button</kbd>', 'Tap to attack the nearest enemy. <b>Hold to charge</b>, release to strike. Slide your thumb off the button to aim by hand.'], ['<kbd>Skill buttons</kbd>', '<b>Tap</b> to cast at the nearest enemy. <b>Drag</b> to aim (a line shows where it lands), release to cast. Drag back to the centre of the button to cancel.'], ['<kbd>Boot button</kbd>', 'Dash where the joystick points (toward your target when standing still). Invincible while dashing.'], ['<kbd>Potions</kbd>', 'Tap the small red / blue buttons to drink.'], ['<kbd>Bag</kbd>', 'Pauses the game. Tap 2–3 cores to merge, or tap 2 cores and press Swap to reorder.']]);
-  const w = SET.control === 'wasd', K = [0, 1, 2, 3].map(i => '<kbd>' + slotLabel(i) + '</kbd>').join(' ');
-  const rows = w ? [['<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>', 'Move. Your attacks and skills always aim at the cursor.']]
-    : [['<kbd>Right-click</kbd>', 'Move there. Hold to follow the cursor. Right-click an enemy to attack it.']];
-  rows.push(['<kbd>Left-click</kbd>', 'Basic attack toward the cursor. <b>Hold to charge</b>: Knight sweeps wider (full charge = shockwave), Ranger slows time and pierces at 75%+, Mage grows a huge orb that refills energy.'],
-    ['<kbd>Space</kbd>', w ? 'Dash where you are moving (toward the cursor when standing still). Invincible while dashing.' : 'Dash toward the cursor. You are invincible while dashing: dash THROUGH boss waves.'],
-    [K, 'Your 4 skill slots. <b>One press casts</b> the skill on that slot. Skills cost <b>energy</b> (blue bar); basic hits refill it.'],
-    ['<kbd>Tab</kbd> / <kbd>I</kbd>', 'Open your bag (pauses the game): merge 2 different cores into a two-element skill, 3 singles into an ultimate, or a merged skill + 1 single to infuse it. Drag cores to choose which 4 are on your bar.'],
-    ['<kbd>Esc</kbd> / <kbd>P</kbd>', 'Pause.'], ['<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>', 'Pick an upgrade card.'], ['<kbd>M</kbd>', 'Mute.']);
-  renderGuide(rows);
-}
-function renderGuide(rows) {
-  const keys = '<table class="keys" style="width:100%">' + rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('') + '</table>';
-  // hướng dẫn cho người mới: cơ bản · điều khiển · ghép lõi · mẹo
-  const cls = (game && game.p && game.p.cls) || runCfg.cls;
+// tab riêng cho Axiom (chỉ khi đang cầm Axiom trong Test Lab): PC và điện thoại dùng chung một bảng, mỗi cột ghi cách bấm của từng máy
+const AX_KEYS = [
+  ['Tap left-click / Tap the big button', 'Basic attack, 3-hit chain. The 3rd hit grants a cube.', 'Tap the big button'],
+  ['Hold left-click, release late', 'Charge. Release while the square is closing: a cut stays on the ground.', 'Hold the big button, release as the square closes'],
+  ['Release a full charge late (after the square)', 'Rapid Slash: lunges forward and spins two cuts along the way.', 'Same: hold, release a little late'],
+  ['Hold a full charge 1 s more', 'Flash Cut: time stops, the screen goes black and white, you walk through, slash once, sheath, then the cut lands.', 'Same: keep holding after full'],
+  ['Shift (tap)', 'Fold: all cuts detonate after a short beat. 4 cuts together hit harder.', 'Cube button (tap)'],
+  ['Shift (hold, aim at a foe, release)', 'Swap places: you take its spot and the foe takes yours. Cost 30 Illusion.', 'Hold cube button, drag onto a foe, release'],
+  ['Shift (hold, sweep 2 foes)', 'Swap those two foes. Cost 40 Illusion.', 'Hold, drag across two foes, release'],
+  ['Shift (hold, aim at yourself)', 'Confusion: foes near you turn on each other for 3 s. Cost 50 Illusion.', 'Hold, drag back into the middle of the button, release'],
+  ['Dash (Space / Dash button) as a shot arrives', 'Mirror dodge: leaves a decoy that pulls enemies, +25 Illusion, +1 cube.', 'Dash button at the last moment'],
+  ['Taking a lethal hit with a full purple bar', 'Mirror Break: the hit was a lie. You return at 35% HP, the attacker takes your place. Once per stage.', 'Same, automatic']
+];
+const axGuide = () => {
+  const touch = TM.touchOn();
+  const rows = AX_KEYS.map(([pc, what, ph]) => '<tr><td>' + (touch ? ph : pc) + '</td><td>' + what + '</td></tr>').join('');
+  return '<table class="keys" style="width:100%">' + rows + '</table>'
+    + '<p class="sub">Purple bar under your feet: Illusion. Cubes orbit you and block shots.</p>';
+};
+function renderControls() { renderGuide(); }
+// How to Play bằng hình: mỗi mục là một thẻ (cảnh động / hình pixel) + một dòng chú thích. Chỉ một cảnh động chạy mỗi lúc (guidedemo.js).
+let guideTab = 'basics', guideHero = null, guideSkill = null;
+function renderGuide() {
+  const cls = (game && game.p && game.p.cls && !(game.lab && !CLASSES[game.p.cls])) ? game.p.cls : runCfg.cls, touch = TM.touchOn();
   const el = e => '<span class="gel" style="color:' + EL_INFO[e].color + '"><img src="' + iconElement(e) + '" alt="">' + EL_INFO[e].name + '</span>';
   const res = (txt, sk) => '<span class="gres">' + (sk ? '<img src="' + iconSkill(sk) + '" alt="">' : '') + txt + '</span>';
   const safe = f => { try { return f(); } catch (e) { return null; } };
+  const OP = s => '<span class="gop">' + s + '</span>';
+  const card = (vis, title, cap, wide) => '<div class="gcard' + (wide ? ' wide' : '') + '"><div class="gvis">' + vis + '</div><div class="gcap"><b>' + title + '</b><span>' + cap + '</span></div></div>';
+  const demo = (id, extra) => '<div class="gdemo" data-demo="' + id + '"><canvas></canvas>' + (extra || '') + '<button class="gplay" aria-label="Play demo">' + PXI('play', 22) + '</button></div>';
+  const key = s => '<kbd class="kc">' + s + '</kbd>';
+  const firstEl = (game && game.p && game.p.cores && game.p.cores[0] && game.p.cores[0].el) || runCfg.element || 'FIRE';
+  const DEMOS = {
+    cast: { kind: 'skill', cls, core: { type: 'el', el: firstEl }, showCd: true, every: 0.3 },
+    dodge: { kind: 'dodge', cls }, move: { kind: 'move', cls }, charge: { kind: 'charge', cls },
+    res: { kind: 'skill', cls, core: { type: 'tri', els: ['FIRE', 'EARTH', 'WIND'] } },
+    mark: { kind: 'skill', cls: 'RANGER', core: { type: 'tri', els: ['WATER', 'EARTH', 'WIND'] }, every: 4 }
+  };
   const duo = safe(() => skillDef(cls, 'FIRE', 'WATER')), tri = safe(() => triDef(cls, ['FIRE', 'WATER', 'EARTH'])), inf = safe(() => infuseDef(cls, ['FIRE', 'WATER'], 'WIND'));
-  const sec = (icon, title, body) => '<div class="gsec"><h4>' + PXI(icon, 16) + title + '</h4>' + body + '</div>';
-  const OP = s => '<span class="gop">' + s + '</span>', CN = (CLASSES[cls] || {}).name || cls;
+  const path = '<div class="gpath">' + Array.from({ length: LAST_STAGE }, (_, i) => (i + 1) % 5 === 0 ? PXI('skull', 16) : '<i class="gdot"></i>').join('') + '</div>';
+  const upCards = '<div class="gups">' + ['star', 'bolt', 'heart'].map(i => '<span class="gup">' + PXI(i, 22) + '</span>').join('') + '</div>';
+  const slot = '<div class="gslot slot" id="gslot"><img src="' + iconSkill(skillDef(cls, firstEl, firstEl)) + '" alt=""></div>';
   const T = {
-    basics: sec('swords', 'Your goal', '<p>Fight through <b>' + LAST_STAGE + ' stages</b>. Every 5th stage is a <b>Titan</b> boss; beat the last one to win the run.</p>')
-      + sec('play', 'A stage, step by step', '<ol class="gsteps"><li>Enemies come in <b>waves</b>. Clear them all to finish the stage.</li><li>Pick <b>1 of 3 upgrade cards</b>. Some cards give a new <b>element core</b> (a new skill).</li><li>After a Titan falls, collect the loot and <b>walk into the gate</b> to reach the next biome.</li></ol>')
-      + sec('bolt', 'Energy and skills', '<p>Skills cost <b>energy</b> (the blue bar). Basic attacks refill it, so keep hitting between casts.</p><p>You have <b>4 skill slots</b> (' + [0, 1, 2, 3].map(i => '<kbd>' + slotLabel(i) + '</kbd>').join(' ') + ') and <b>6 bag slots</b> for spare cores.</p>')
-      + sec('coin', 'Gold, smiths and relics', '<p>Enemies drop <b>gold</b>. Sometimes a <b>smith</b> camps nearby: buy stat boosts, forge (upgrade) a skill, or take one <b>Cursed Relic</b>. Relics are strong but always come with a price.</p>')
-      + sec('gem', 'After a run', '<p>Win or lose, you earn <b>gems</b>. Spend them in <b>Shop &amp; Skins</b>. Daily Quests give extra gems.</p>'),
-    controls: keys,
-    get axiom() { return axGuide(); },
-    merge: sec('sparkle', 'What is merging?', '<p>Each <b>core</b> is one element: Fire, Water, Earth or Wind. Open the <b>Bag</b> (<kbd>Tab</kbd>), click cores to put them on the merge table, then press <b>Merge</b>. A merged skill is stronger than its parts and does more.</p><p>The examples below use your hero, <b>' + CN + '</b>.</p>')
-      + sec('flame', 'Recipes', '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('→') + res('Two-element skill' + (duo ? ': ' + duo.name : ''), duo) + '<span class="gnote">2 single cores of <b>different</b> elements. Order matters: the first core sets the main effect.</span></div>'
-        + '<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('+') + el('EARTH') + OP('→') + res('Ultimate' + (tri ? ': ' + tri.name : ''), tri) + '<span class="gnote">3 single cores, all different. Costs <b>1 Fusion Shard</b> ◆ (break purple crystals or defeat elites).</span></div>'
-        + '<div class="grec">' + res('Two-element skill') + OP('+') + el('WIND') + OP('→') + res('Infused skill' + (inf ? ': ' + inf.name : ''), inf) + '<span class="gnote">A merged skill plus 1 single core adds a third element on top.</span></div>')
-      + sec('lock', 'What can\'t be merged', '<ul><li>Two cores of the <b>same</b> element.</li><li>Two merged skills together.</li><li>Ultimates and infused skills: they are final.</li></ul>')
-      + sec('bag', 'Merge tips', '<ul><li>Click 2 or 3 cores and the table <b>previews the result</b> before you merge.</li><li>Drag cores between the bar and the bag to choose your 4 active skills.</li><li>Opening the Bag pauses the game, so merge whenever you like.</li></ul>'),
-    tips: sec('heart', 'Staying alive', '<ul><li><kbd>Space</kbd> dash makes you <b>invincible</b>: dash through boss attacks and shockwaves.</li><li>Coloured marks on the ground show where an attack will land. Step out of them.</li><li>Potions heal. The smith sells more.</li></ul>')
-      + sec('star', 'Getting stronger', '<ul><li>Merge early: one merged skill beats two single ones.</li><li>Hold left-click to <b>charge</b> your basic attack for big hits.</li><li>Read a relic\'s price before you buy it. Open the Bag any time to check your build.</li></ul>')
+    basics: '<div class="ggrid">'
+      + card(path, 'Clear ' + LAST_STAGE + ' stages', 'Every 5th stage is a Titan boss. Beat the last one to win.')
+      + card(demo('cast', slot), 'Skills and cooldowns', 'Each skill slot has its own cooldown (the dark sweep) and costs energy.')
+      + card(demo('dodge'), 'Dash through attacks', 'Red marks show where hits land. You can\'t be hit while dashing.')
+      + card(upCards, 'Pick 1 of 3 upgrades', 'After every stage. Some cards give a new element core.')
+      + card('<div class="gicons">' + PXI('anvil', 30) + PXI('coin', 26) + PXI('skull', 26) + '</div>', 'Smiths', 'Spend gold on stat boosts, forged skills and cursed relics.')
+      + card('<div class="gicons">' + PXI('gem', 30) + PXI('trophy', 28) + '</div>', 'Gems', 'Win or lose, earn gems for skins and trails.')
+      + '</div>',
+    controls: touch
+      ? '<div class="gphone"><span class="gj">' + PXI('arrowR', 18) + '<em>Drag: move</em></span><span class="gb big">' + PXI('swords', 26) + '<em>Tap: attack · Hold: charge</em></span><span class="gb sk">' + [0, 1, 2, 3].map(() => '<i></i>').join('') + '<em>Tap: cast · Drag: aim</em></span><span class="gb boot">' + PXI('boot', 18) + '<em>Dash</em></span><span class="gb pots">' + PXI('potionHp', 18) + PXI('potionEn', 18) + '<em>Potions</em></span><span class="gb bag">' + PXI('bag', 18) + '<em>Bag</em></span></div>'
+      : '<div class="ggrid">'
+        + card('<div class="gkeys">' + (SET.control === 'wasd' ? key('W') + key('A') + key('S') + key('D') : PXI('mouse', 30) + '<small>right</small>') + '</div>', 'Move', SET.control === 'wasd' ? 'Attacks and skills aim at the cursor.' : 'Right-click to walk there, hold to follow.')
+        + card(demo('charge'), 'Attack · hold to charge', 'Left-click. A full charge hits much harder.')
+        + card(demo('move'), 'Dash', key('Space') + ' Invincible while dashing.')
+        + card('<div class="gkeys">' + [0, 1, 2, 3].map(i => key(slotLabel(i))).join('') + '</div>', 'Skills', 'One press casts the skill in that slot.')
+        + card('<div class="gkeys">' + key('Tab') + PXI('bag', 26) + '</div>', 'Bag', 'Pauses the game. Merge cores and choose your 4 skills.')
+        + card('<div class="gkeys">' + key('Esc') + key('1') + key('2') + key('3') + key('M') + '</div>', 'Pause · cards · mute', 'Esc pauses, 1–3 pick an upgrade, M mutes.')
+        + '</div>',
+    skills: '', // dựng riêng bên dưới (cần Game tạm để đọc giá / hồi chiêu)
+    merge: '<div class="ggrid">'
+      + card('<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('→') + res(duo ? duo.name : 'Two-element skill', duo) + '</div>', 'Two different cores', 'Make a two-element skill. The first core sets the main effect.', true)
+      + card('<div class="grec">' + el('FIRE') + OP('+') + el('WATER') + OP('+') + el('EARTH') + OP('→') + res(tri ? tri.name : 'Ultimate', tri) + '</div>', 'Three different cores', 'Make an ultimate. Costs 1 Fusion Shard ◆.', true)
+      + card('<div class="grec">' + res('Two-element skill') + OP('+') + el('WIND') + OP('→') + res(inf ? inf.name : 'Infused skill', inf) + '</div>', 'Merged + one core', 'Infuse a third element on top.', true)
+      + card(demo('res'), 'Resonance', 'Every ultimate gives a 5 s buff from its three elements: rings at your feet.')
+      + card(demo('mark'), 'Marks', 'Some ultimates mark foes (purple diamond): marked foes take more damage.')
+      + card('<div class="grec">' + el('FIRE') + OP('+') + el('FIRE') + OP('✗') + '</div>', 'Can\'t merge', 'Two of the same element, two merged skills, or a finished ultimate.')
+      + '</div>',
+    tips: '<div class="ggrid">'
+      + card(demo('dodge'), 'Watch the ground', 'Step or dash out of red marks before they fill.')
+      + card('<div class="gicons">' + PXI('potionHp', 30) + PXI('potionEn', 30) + '</div>', 'Potions', 'Red heals, blue refills energy. The smith sells more.')
+      + card('<div class="gicons">' + PXI('swords', 26) + PXI('eye', 26) + '</div>', 'Elites', 'Each elite has its own tactic: flanking, kiting, hiding behind grunts. Focus them first.')
+      + card('<div class="gicons">' + PXI('sparkle', 26) + PXI('star', 26) + '</div>', 'Merge for ultimates', 'Ultimates cost more but bring control, buffs and big area damage.')
+      + '</div>',
+    get axiom() { return axGuide(); }
   };
-  // tab riêng cho Axiom (chỉ khi đang cầm Axiom trong Test Lab): PC và điện thoại dùng chung một bảng, mỗi cột ghi cách bấm của từng máy
-  const AX_KEYS = [
-    ['Tap left-click / Tap the big button', 'Basic attack, 3-hit chain. The 3rd hit grants a cube.', 'Tap the big button'],
-    ['Hold left-click, release late', 'Charge. Release while the square is closing: a cut stays on the ground.', 'Hold the big button, release as the square closes'],
-    ['Release a full charge late (after the square)', 'Rapid Slash: lunges forward and spins two cuts along the way.', 'Same: hold, release a little late'],
-    ['Hold a full charge 1 s more', 'Flash Cut: time stops, the screen goes black and white, you walk through, slash once, sheath, then the cut lands.', 'Same: keep holding after full'],
-    ['Shift (tap)', 'Fold: all cuts detonate after a short beat. 4 cuts together hit harder.', 'Cube button (tap)'],
-    ['Shift (hold, aim at a foe, release)', 'Swap places: you take its spot and the foe takes yours. Cost 30 Illusion.', 'Hold cube button, drag onto a foe, release'],
-    ['Shift (hold, sweep 2 foes)', 'Swap those two foes. Cost 40 Illusion.', 'Hold, drag across two foes, release'],
-    ['Shift (hold, aim at yourself)', 'Confusion: foes near you turn on each other for 3 s. Cost 50 Illusion.', 'Hold, drag back into the middle of the button, release'],
-    ['Dash (Space / Dash button) as a shot arrives', 'Mirror dodge: leaves a decoy that pulls enemies, +25 Illusion, +1 cube.', 'Dash button at the last moment'],
-    ['Taking a lethal hit with a full purple bar', 'Mirror Break: the hit was a lie. You return at 35% HP, the attacker takes your place. Once per stage.', 'Same, automatic']
-  ];
-  const axGuide = () => {
-    const touch = TM.touchOn();
-    const rows = AX_KEYS.map(([pc, what, ph]) => '<tr><td>' + (touch ? ph : pc) + '</td><td>' + what + '</td></tr>').join('');
-    return '<table class="keys" style="width:100%">' + rows + '</table>'
-      + '<p class="sub">Purple bar under your feet: Illusion. Cubes orbit you and block shots.</p>';
-  };
-  const TABS = [['basics', 'Basics'], ['controls', 'Controls'], ['merge', 'Merging'], ['tips', 'Tips']];
+  // tab Skills: chọn tướng → lưới chiêu (đơn, đôi, tuyệt kỹ) → chạm để xem trước trực tiếp
+  const HEROES = ['KNIGHT', 'RANGER', 'MAGE'].concat(isAxiomRun() ? ['AXIOM'] : []);
+  if (!guideHero || !HEROES.includes(guideHero)) guideHero = HEROES.includes(cls) ? cls : 'KNIGHT';
+  if (guideTab === 'skills') {
+    const tmp = new Game(1, guideHero, { training: true, lab: true }), cores = [];
+    for (const a of EL) cores.push({ type: 'el', el: a });
+    for (const a of EL) for (const b of EL) if (a !== b) cores.push({ type: 'duo', els: [a, b] });
+    for (const s of TRI_SETS) cores.push({ type: 'tri', els: s.slice() });
+    if (!guideSkill || guideSkill.cls !== guideHero) guideSkill = { cls: guideHero, core: cores[0] };
+    const sk = tmp.coreSkill(guideSkill.core);
+    const btn = (c, i) => { const s = tmp.coreSkill(c); return '<button class="gskb' + (JSON.stringify(c) === JSON.stringify(guideSkill.core) ? ' on' : '') + '" data-i="' + i + '" title="' + escH(s.name) + '"><img src="' + iconSkill(s) + '" alt=""></button>'; };
+    const group = (title, from, to) => '<div class="gskg"><h5>' + title + '</h5><div class="gsk">' + cores.slice(from, to).map((c, k) => btn(c, from + k)).join('') + '</div></div>';
+    T.skills = '<div class="tabs seg gher">' + HEROES.map(h => '<button data-h="' + h + '" class="' + (h === guideHero ? 'on' : '') + '">' + CLASSES[h].name + '</button>').join('') + '</div>'
+      + '<div class="gskwrap"><div class="gcard gskpv">' + demo('skill') + '<div class="gcap"><b>' + escH(sk.name) + '</b><span>' + GROUP_NAME[sk.group] + ' · ' + sk.cost + ' energy · ' + (sk.cd || 0).toFixed(1) + ' s cooldown</span><span class="gdesc">' + escH(sk.desc || '') + '</span></div></div>'
+      + '<div class="gsklist">' + group('Single', 0, 4) + group('Two elements', 4, 16) + group('Ultimates', 16, 20) + '</div></div>';
+    DEMOS.skill = { kind: 'skill', cls: guideHero, core: guideSkill.core, live: false };
+    T._cores = cores;
+  }
+  const TABS = [['basics', 'Basics'], ['controls', 'Controls'], ['skills', 'Skills'], ['merge', 'Merging'], ['tips', 'Tips']];
   if (isAxiomRun()) TABS.push(['axiom', 'Axiom']);
-  if (!T[guideTab]) guideTab = 'basics';
+  if (!(guideTab in T)) guideTab = 'basics';
   $('guidetabs').innerHTML = TABS.map(([k, n]) => '<button data-g="' + k + '" class="' + (k === guideTab ? 'on' : '') + '">' + n + '</button>').join('');
-  for (const b of $('guidetabs').children) b.onclick = () => { guideTab = b.dataset.g; renderControls(); };
-  $('guidebody').innerHTML = T[guideTab]; $('guidebody').scrollTop = 0;
+  for (const b of $('guidetabs').children) b.onclick = () => { guideTab = b.dataset.g; renderGuide(); };
+  const B = $('guidebody'); B.innerHTML = T[guideTab]; B.scrollTop = 0;
+  for (const b of B.querySelectorAll('.gher button')) b.onclick = () => { guideHero = b.dataset.h; guideSkill = null; renderGuide(); };
+  for (const b of B.querySelectorAll('.gskb')) b.onclick = () => { guideSkill = { cls: guideHero, core: T._cores[+b.dataset.i] }; renderGuide(); };
+  // cảnh động: chạm để chạy; cảnh đầu tiên của tab tự chạy
+  const play = box => { for (const x of B.querySelectorAll('.gdemo.on')) x.classList.remove('on'); box.classList.add('on'); const sc = DEMOS[box.dataset.demo], sl = box.querySelector('#gslot');
+    GD.startDemo(box.querySelector('canvas'), sc, sl ? g => { const s = g.coreSkill(sc.core); TM.coolMark(sl, g.p.cds[s.key] || 0, s.cd); } : null); };
+  const boxes = [...B.querySelectorAll('.gdemo')]; for (const box of boxes) box.querySelector('.gplay').onclick = () => play(box);
+  GD.stopDemo(); if (boxes.length) requestAnimationFrame(() => play(boxes[0]));
 }
-let guideTab = 'basics';
 const isAxiomRun = () => !!(game && game.p && game.p.cls === 'AXIOM');
 
 // ---------- tạo lượt mới ----------
