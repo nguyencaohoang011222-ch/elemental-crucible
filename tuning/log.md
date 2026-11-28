@@ -12,3 +12,4 @@ One line per `/tune` round (kept or reverted). Score = `node tools/tune/check.mj
 | 2026-11-28 | `BURN.mob` (game.js) | 3.7 → 3.3 | Flame Cleave 8.04 → 7.69, Meteor Shower 4.96 → 4.82, Fire Rain 4.67 → 4.51 | 41.829 → 40.536 | kept |
 | 2026-11-28 | KNIGHT Flame Cleave `cd` tier (kits.js) | 4.6 → 5.0 | Flame Cleave 7.69 → 7.14 | 40.536 → 40.067 | kept |
 | 2026-11-28 | MAGE Meteor Shower `cd` (kits.js) | 8 → 7.2 | Meteor Shower 4.82 → 5.28 (worse) | 40.067 → 40.358 | reverted |
+| 2026-11-28 | `ELITE.hp` (env.js) | 1.6 → 1.45 | elite time to kill 13.17 → 10.73 s (target 6–12) | 40.851 → 39.798 | kept |

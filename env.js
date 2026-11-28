@@ -25,7 +25,7 @@ add('EMBERMAGE',  { name: 'Ember Caller',  ai: 'shooter',  hp: 58,  speed: 80,  
 add('MINISPORE',  { name: 'Spore Imp',     ai: 'melee',    hp: 18,  speed: 125, r: 10, dmg: 6,  color: '#b8e070', mass: 0.5, onHit: 'poison', death: 'puddle', mini: true });
 add('ILLUSION',   { name: 'Illusion',      ai: 'assassin', hp: 1,   speed: 130, r: 14, dmg: 10, color: '#a87aff', mass: 0.5, illusion: true });
 // ELITE: hệ số chỉ số của quái tinh anh so với số gốc bên dưới (vòng lặp /tune được phép chỉnh); reach: tầm chiêu đặc biệt
-export const ELITE = { hp: 1.6, speed: 1.15, dmg: 1.2, reach: 1.4 };
+export const ELITE = { hp: 1.45, speed: 1.15, dmg: 1.2, reach: 1.4 };
 const elite = (k, base, o) => add(k, { elite: true, base, mass: 3, gold: 6, ...o, hp: Math.round(o.hp * ELITE.hp), speed: Math.round(o.speed * ELITE.speed), dmg: Math.round(o.dmg * ELITE.dmg) });
 elite('EMBERHULK',   'GRUNT',      { name: 'Ember Hulk',       ai: 'melee',   hp: 90, speed: 105, r: 18, dmg: 20, color: '#ff7a3c', aura: '#ff3a2a', skill: 'quake' });
 elite('GLACIER',     'ICEMAGE',    { name: 'Rime Seer', ai: 'shooter', hp: 75, speed: 96,  r: 16, dmg: 16, color: '#9fe6ff', aura: '#a87aff', skill: 'frostbeam', shot: 'ice' });
