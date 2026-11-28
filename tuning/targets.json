@@ -39,10 +39,10 @@
     "weight": 3
   },
   "brutal": {
-    "_why": "Brutal progress / Normal progress for the good bot, all heroes pooled. Brutal should be 25-45% harder.",
+    "_why": "Brutal progress / Normal progress for the good bot, all heroes pooled. Brutal should be 40-60% harder (user, 2026-11-28).",
     "ratio": [
-      0.55,
-      0.75
+      0.4,
+      0.6
     ],
     "weight": 3
   },
