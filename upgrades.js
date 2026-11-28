@@ -21,7 +21,7 @@ export const MINOR = [
   { id: 'water',   name: 'Water Mastery',    el: 'WATER', max: 5, text: 'Water skills cost 12% less energy. Freeze, slow and root +25%.', apply: m => { m.elCd.WATER = (m.elCd.WATER || 1) * 0.88; m.freeze *= 1.25; } },
   { id: 'earth',   name: 'Earth Mastery',    el: 'EARTH', max: 5, text: 'Earth skills +15% area. Stuns +25%.', apply: m => { m.earthRadius *= 1.15; m.stun *= 1.25; } },
   { id: 'wind',    name: 'Wind Mastery',     el: 'WIND',  max: 5, text: 'Wind skills cost 12% less energy. Knockback +25%.', apply: m => { m.elCd.WIND = (m.elCd.WIND || 1) * 0.88; m.push *= 1.25; } },
-  { id: 'split',   name: 'Split Shot',       tag: 'projectile', max: 3, color: '#ffd36b', text: 'Projectile skills fire extra projectiles.', apply: m => { m.projExtra++; } },
+  { id: 'split',   name: 'Split Shot',       tag: 'projectile', max: 3, color: '#ffd36b', text: 'Projectile skills fire extra projectiles (35% damage each). Those skills cost 10% more energy.', apply: m => { m.projExtra++; } },
   { id: 'pierce',  name: 'Piercing',         tag: 'projectile', max: 3, color: '#ffd36b', text: 'Skill projectiles pierce +1 enemy.', apply: m => { m.pierce++; } },
   { id: 'wide',    name: 'Wide Reach',       tag: 'area|melee', max: 4, color: '#ff9a4a', text: 'Area and melee skills +15% radius.', apply: m => { m.radius *= 1.15; } },
   { id: 'linger',  name: 'Lingering Magic',  tag: 'zone|trap', max: 4, color: '#9ac060', text: 'Zones and traps last 35% longer.', apply: m => { m.zoneLife *= 1.35; } },

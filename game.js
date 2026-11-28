@@ -39,6 +39,7 @@ export const STAT_DROPS = [
   { id: 'regen', name: '+1 energy per kill', apply: m => { m.energyKill = (m.energyKill || 0) + 1; } },
   { id: 'basic', name: '+4% attack damage', apply: m => { m.basic *= 1.04; } }
 ];
+export const SPLIT_SIDE = 0.35, SPLIT_COST = 0.1;   // Split Shot: sát thương đạn phụ, giá chiêu thêm mỗi cấp
 const SKILL_SHOTS = new Set(['sbolt', 'sarrow', 'crescent', 'cyclone', 'shard']);
 const CC_INTERRUPT = ['stun', 'freeze', 'root'];
 
@@ -121,11 +122,18 @@ export class Game extends Sim {
     if (def.tags.includes('projectile') && (m.projExtra || m.pierce)) {
       if (out.shape === 'volley') out.count += 2 * m.projExtra;
       if (out.arrows) out.arrows.count += m.projExtra;
-      if (out.split) out.split.count += 2 * m.projExtra;
+      if (out.split) out.split.count += m.projExtra;
       if (out.shards) out.shards.count += 2 * m.projExtra;
       if (out.shape === 'bolt' || out.shape === 'cyclone') out.extra = m.projExtra;
       if (out.crescent && !out.radial) out.extra = m.projExtra;
       for (const o of [out, out.arrows, out.crescent]) if (o) o.pierce = (o.pierce ?? 0) >= 50 ? o.pierce : (o.pierce ?? 0) + m.pierce;
+      // Split Shot: đạn phụ chỉ gây SPLIT_SIDE sát thương (kể cả nổ / mảnh vỡ), mỗi cấp tăng giá chiêu SPLIT_COST
+      if (m.projExtra) {
+        const f = { dmg: SPLIT_SIDE, rad: 1, burn: 1, freeze: 1, stun: 1, life: 1, push: 1 };
+        if (out.extra && (out.shape === 'bolt' || out.shape === 'cyclone')) out.side = scaleDef(out, f);
+        if (out.extra && out.crescent) out.crescentSide = scaleDef(out.crescent, f);
+        out.cost = Math.round(out.cost * (1 + SPLIT_COST * m.projExtra));
+      }
     }
     return out;
   }
@@ -343,7 +351,7 @@ export class Game extends Sim {
         this.emit('arcSlash', { x: p.x, y: p.y, a, range: sk.range, arc: sk.arc, el: fx });
         if (sk.crescent) {
           const k = sk.radial || (1 + 2 * (sk.extra || 0));
-          for (let i = 0; i < k; i++) { const ang = sk.radial ? a + i * TAU / k : a + (i - (k - 1) / 2) * 0.22; this.proj('crescent', p.x, p.y, ang, sk.crescent, sk); }
+          for (let i = 0; i < k; i++) { const ang = sk.radial ? a + i * TAU / k : a + (i - (k - 1) / 2) * 0.22; const side = !sk.radial && sk.crescentSide && i !== (k - 1) / 2; this.proj('crescent', p.x, p.y, ang, side ? sk.crescentSide : sk.crescent, sk); }
         }
         if (sk.leave) { const o = sk.leave.offset || 0; this.addZone(sk.leave.kind, p.x + Math.cos(a) * o, p.y + Math.sin(a) * o, sk.leave.radius, sk.leave.life); }
         if (n) this.hitstop = Math.max(this.hitstop, sk.group === 'ULTIMATE' ? 0.09 : 0.05);
@@ -377,7 +385,7 @@ export class Game extends Sim {
       case 'charge': this.startDash('charge', sk, a, ax, ay, (sk.charges || 1) - 1); break;
       case 'roll': this.startDash('roll', sk, a + Math.PI, ax, ay, (sk.rolls || 1) - 1); this.rollShots(sk, ax, ay); break;
       case 'leap': { const [tx, ty] = this.aimTarget(sk, ax, ay); p.leap = { x0: p.x, y0: p.y, x1: tx, y1: ty, t: 0, T: sk.time, sk }; p.inv = Math.max(p.inv, sk.time + 0.15); break; }
-      case 'bolt': { const n = 1 + 2 * (sk.extra || 0); for (let i = 0; i < n; i++) this.proj('sbolt', p.x, p.y, a + (i - (n - 1) / 2) * 0.16, sk, sk); break; }
+      case 'bolt': { const n = 1 + 2 * (sk.extra || 0); for (let i = 0; i < n; i++) { const s = sk.side && i !== (n - 1) / 2 ? sk.side : sk; this.proj('sbolt', p.x, p.y, a + (i - (n - 1) / 2) * 0.16, s, s); } break; }
       case 'volley': {
         const waves = sk.waves || 1;
         const fan = () => { const ang0 = Math.atan2(ay - p.y, ax - p.x); for (let i = 0; i < sk.count; i++) this.proj('sarrow', p.x, p.y, ang0 + (sk.count > 1 ? (i - (sk.count - 1) / 2) * sk.spread / (sk.count - 1) : 0), sk, sk); this.emit('volley', { x: p.x, y: p.y }); };
@@ -437,7 +445,7 @@ export class Game extends Sim {
         if (sk.nova) { this.hitCircle(p.x, p.y, sk.nova.radius, sk.nova, sk); this.emit('slam', { x: p.x, y: p.y, r: sk.nova.radius, el: fx }); }
         break;
       }
-      case 'cyclone': { const n = 1 + 2 * (sk.extra || 0); for (let i = 0; i < n; i++) this.proj('cyclone', p.x, p.y, a + (i - (n - 1) / 2) * 0.3, sk, sk); break; }
+      case 'cyclone': { const n = 1 + 2 * (sk.extra || 0); for (let i = 0; i < n; i++) { const s = sk.side && i !== (n - 1) / 2 ? sk.side : sk; this.proj('cyclone', p.x, p.y, a + (i - (n - 1) / 2) * 0.3, s, s); } break; }
       case 'well': { const [tx, ty] = this.aimTarget(sk, ax, ay); this.addZone('well', tx, ty, sk.radius, sk.life, { sk }); break; }
       case 'storm': this.addZone('storm', p.x, p.y, sk.radius, sk.life, { follow: true, tick: sk.tick, eff: sk, sk }); break;
     }

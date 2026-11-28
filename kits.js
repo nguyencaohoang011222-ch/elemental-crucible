@@ -35,7 +35,7 @@ export const KITS = {
   },
   RANGER: {
     forms: { FIRE: 'Volley', WATER: 'Trap', EARTH: 'Rain', WIND: 'Tumble' },
-    'FIRE>FIRE':   S('Phoenix Arrow', 'DAMAGE', 5, 'bolt', { speed: 1050, range: 720, r: 12, dmg: 62, pierce: 99, burn: 3, explode: { radius: 95, dmg: 40, burn: 2 } }, ['projectile'], 'A blazing arrow that pierces everything and explodes at the end.'),
+    'FIRE>FIRE':   S('Phoenix Arrow', 'DAMAGE', 6, 'bolt', { speed: 1050, range: 720, r: 12, dmg: 46, pierce: 99, burn: 3, explode: { radius: 95, dmg: 30, burn: 2 } }, ['projectile'], 'A blazing arrow that pierces everything and explodes at the end.'),
     'FIRE>WATER':  S('Scalding Volley', 'CONTROL', 5, 'volley', { count: 5, spread: 0.55, speed: 900, range: 480, r: 6, dmg: 15, blind: 0.9, burn: 1.5 }, ['projectile'], 'Five scalding arrows that blind what they hit.'),
     'FIRE>EARTH':  S('Blast Arrows', 'AREA', 6, 'volley', { count: 3, spread: 0.3, speed: 820, range: 520, r: 7, dmg: 17, explode: { radius: 72, dmg: 30, stun: 0.5 } }, ['projectile', 'area'], 'Three explosive arrows that stun on impact.'),
     'FIRE>WIND':   S('Firestorm Volley', 'DAMAGE', 6, 'volley', { count: 9, spread: 0.95, speed: 950, range: 500, r: 6, dmg: 14, pierce: 1, burn: 2 }, ['projectile'], 'A wide fan of nine burning arrows.'),
@@ -54,7 +54,7 @@ export const KITS = {
   },
   MAGE: {
     forms: { FIRE: 'Orb', WATER: 'Lance', EARTH: 'Meteor', WIND: 'Blink' },
-    'FIRE>FIRE':   S('Inferno Orb', 'DAMAGE', 5, 'bolt', { speed: 440, range: 520, r: 14, dmg: 40, pierce: 0, explode: { radius: 120, dmg: 55, burn: 3 }, split: { count: 6, dmg: 20, speed: 420, range: 180, r: 7, burn: 2 } }, ['projectile', 'area'], 'A huge fireball that explodes and splits into six embers.'),
+    'FIRE>FIRE':   S('Inferno Orb', 'DAMAGE', 6, 'bolt', { speed: 440, range: 520, r: 14, dmg: 30, pierce: 0, explode: { radius: 120, dmg: 42, burn: 3 }, split: { count: 5, dmg: 14, speed: 420, range: 180, r: 7, burn: 2 } }, ['projectile', 'area'], 'A huge fireball that explodes and splits into five embers.'),
     'FIRE>WATER':  S('Steam Bomb', 'CONTROL', 6, 'bolt', { speed: 520, range: 480, r: 12, dmg: 20, explode: { radius: 110, dmg: 34 }, leave: { kind: 'steam', radius: 125, life: 4 } }, ['projectile', 'zone'], 'A bomb that bursts into a blinding steam cloud.'),
     'FIRE>EARTH':  S('Magma Bomb', 'AREA', 7, 'bolt', { speed: 480, range: 480, r: 13, dmg: 24, explode: { radius: 100, dmg: 56, stun: 0.6 }, leave: { kind: 'lava', radius: 95, life: 4 } }, ['projectile', 'area', 'zone'], 'A molten bomb: stuns and leaves lava.'),
     'FIRE>WIND':   S('Fire Cyclone', 'AREA', 6, 'cyclone', { speed: 240, range: 520, r: 56, dmg: 10, tick: 0.16, burn: 2.5, pull: 70 }, ['projectile', 'area'], 'A slow fire whirl that drags enemies along and burns them.'),
