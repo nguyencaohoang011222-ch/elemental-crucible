@@ -82,7 +82,7 @@ export const RESONANCE = { t: 5, fire: 0.2, waterHeal: 0.04, earthShield: 0.15, 
 // ULTFX: đặc sản tuyệt kỹ dùng chung (dấu nhận thêm sát thương có trần trên boss, ngưỡng kết liễu)
 export const ULTFX = { bossVulnCap: 0.15, execAt: 0.3 };
 // BURN: sát thương thiêu đốt mỗi 0,5 s (cố định, không theo sức chiêu: chiêu lửa nào cũng đốt như nhau)
-export const BURN = { mob: 4.3, boss: 10 };
+export const BURN = { mob: 3.7, boss: 10 };
 export const COST = { flat: 7, perCd: 3.4, tier: [1.15, 1, 1] };
 export const BRUTAL = { count: 1.35, aggro: 1.4, elite: 0.55, bossWind: 0.78, bossIdle: 0.55, bossSpeed: 1.15, link: 0.25, twinSpread: 0.2 };
 export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
