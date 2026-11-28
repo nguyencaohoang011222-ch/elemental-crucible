@@ -12,3 +12,6 @@ marketing/raw_clips/
 marketing/output/
 marketing/.cache/
 __pycache__/
+
+# vòng lặp cân bằng: báo cáo tạo lại mỗi lần chạy
+tuning/report.json

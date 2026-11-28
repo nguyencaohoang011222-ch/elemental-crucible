@@ -134,6 +134,36 @@ const U = {
   }
 };
 
+// ---------- Axiom: tuyệt kỹ hình khối (dùng hiệu ứng mặt cắt/khối của Axiom qua sự kiện axFold) ----------
+const boxPlanes = (x, y, s) => [{ x1: x - s, y1: y - s, x2: x + s, y2: y - s }, { x1: x + s, y1: y - s, x2: x + s, y2: y + s }, { x1: x + s, y1: y + s, x2: x - s, y2: y + s }, { x1: x - s, y1: y + s, x2: x - s, y2: y - s }];
+Object.assign(U, {
+  axcoffin(g, sk, ax, ay) {   // khối khổng lồ đóng lại: 6 lần tường ập vào (kéo vào giữa), rồi co sập
+    const p = g.p, [cx, cy] = clampR(g, p.x, p.y, ax, ay, 360), F = sk.forged, hits = F ? 8 : 6;
+    for (let i = 0; i < hits; i++) { const s = 190 - i * (120 / hits); g.pend(0.3 + i * 0.16 * (1 - i * 0.05), () => { const n = ring(g, sk, cx, cy, s, 34, sk.wall); pullIn(g, cx, cy, s + 40, 900, 0.06); g.emit('axFold', { planes: boxPlanes(cx, cy, s), box: true, hits: n }); }); }
+    g.pend(0.3 + hits * 0.15 + 0.2, () => { hit(g, sk, cx, cy, F ? 190 : 160, F ? { ...sk.crush, dmg: sk.crush.dmg * 1.3 } : sk.crush); g.emit('axFold', { planes: boxPlanes(cx, cy, 40), box: true, hits: 1 }); fx(g, sk, 'supernova', { x: cx, y: cy, r: 160 }); g.hitstop = Math.max(g.hitstop, 0.14); });
+  },
+  axprism(g, sk) {   // 4 tấm kính quay quanh người 3s
+    const p = g.p, F = sk.forged, N = F ? 6 : 4;
+    ent(g, sk, { kind: 'prism', life: F ? 4 : 3, a: p.aim, tick: 0, update(g, dt, o) {
+      o.a += dt * 2.4; o.tick -= dt; if (o.tick > 0) return; o.tick = 0.2;
+      for (let k = 0; k < N; k++) { const a = o.a + k * TAU / N, x2 = p.x + Math.cos(a) * 270, y2 = p.y + Math.sin(a) * 270; g.hitLine(p.x, p.y, x2, y2, 20, sk.beam, sk); g.emit('beam', { x1: p.x, y1: p.y, x2, y2, w: 30, el: 'WATER' }); }
+      clearShots(g, p.x, p.y, 90);
+    } });
+  },
+  axrain(g, sk, ax, ay) {   // mưa khối dồn nhịp, một nhịp câm, rồi khối lớn
+    const p = g.p, [cx, cy] = clampR(g, p.x, p.y, ax, ay, 380), F = sk.forged, N = F ? 20 : 14; let t = 0.25;
+    for (let i = 0; i < N; i++) { const a = g.rand() * TAU, r = Math.sqrt(g.rand()) * 230, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; t += Math.max(0.05, 0.16 - i * 0.008);
+      g.pend(t, () => { hit(g, sk, x, y, 58, sk.cube); g.emit('axFold', { planes: boxPlanes(x, y, 26), box: false, hits: 0 }); g.emit('slam', { x, y, r: 58, el: 'EARTH' }); }, { x, y, r: 58, el: 'EARTH', fall: true }); }
+    g.pend(t + 0.35, () => { hit(g, sk, cx, cy, F ? 200 : 170, sk.final); g.emit('axFold', { planes: boxPlanes(cx, cy, 90), box: true, hits: 1 }); fx(g, sk, 'stoneNova', { x: cx, y: cy, r: 170 }); g.hitstop = Math.max(g.hitstop, 0.12); }, { x: cx, y: cy, r: 170, el: 'EARTH', fall: true });
+  },
+  axfold(g, sk, ax, ay) {   // gập cả vùng về một điểm, ép lại, rồi bước ra ngay giữa
+    const p = g.p, [cx, cy] = clampR(g, p.x, p.y, ax, ay, 380), F = sk.forged, R = F ? 380 : 320;
+    ent(g, sk, { kind: 'fold', life: 0.6, update(g, dt, o) { pullIn(g, cx, cy, R, 2600, dt); } });
+    g.emit('axFold', { planes: boxPlanes(cx, cy, R * 0.6), box: false, hits: 0 });
+    g.pend(0.62, () => { hit(g, sk, cx, cy, 180, F ? { ...sk.fold, dmg: sk.fold.dmg * 1.3 } : sk.fold); g.emit('axFold', { planes: boxPlanes(cx, cy, 60), box: true, hits: 1 }); fx(g, sk, 'supernova', { x: cx, y: cy, r: 180 });
+      const ox = p.x, oy = p.y; p.x = cx; p.y = cy; p.vx = p.vy = 0; p.inv = Math.max(p.inv, 0.5); if (g.world) g.world.collide(p, p.r); if (g.arena) g.clampArena(p, p.r); g.emit('blink', { x1: ox, y1: oy, x2: p.x, y2: p.y }); g.hitstop = Math.max(g.hitstop, 0.12); });
+  }
+});
 export function castUlt(g, sk, ax, ay) {
   const f = U[sk.ult]; if (!f) return false;
   g.emit('ultCast', { x: g.p.x, y: g.p.y, name: sk.name, pal: sk.pal, id: sk.ult }); g.hitstop = Math.max(g.hitstop, 0.05);

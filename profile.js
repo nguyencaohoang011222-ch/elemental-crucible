@@ -141,7 +141,7 @@ export function runEnded(stage, won, cls) {
     const firstEver = P.stats.wins === 1, firstClass = !P.skins.includes(cls + ':titanslayer');
     if (firstEver) { n += ECON.firstWin; bonus.push(['First victory', ECON.firstWin]); if (!P.trails.includes('crown')) { P.trails.push('crown'); unlocks.push({ kind: 'trail', id: 'crown', name: 'Crown Lightning' }); } }
     if (firstClass) { n += ECON.firstClassWin; bonus.push(['First win as this hero', ECON.firstClassWin]); P.skins.push(cls + ':titanslayer'); unlocks.push({ kind: 'skin', cls, id: 'titanslayer', name: 'Titanslayer' }); }
-    if (arguments[3] === 'HARD') { n += ECON.hardWin; bonus.push(['Hard difficulty', ECON.hardWin]); }
+    if (arguments[3] === 'HARD') { n += ECON.hardWin; bonus.push(['Brutal difficulty', ECON.hardWin]); }
   }
   P.gems += n; const got = track('runs', 0); save(); return { gems: n, ach: got, unlocks, bonus };
 }

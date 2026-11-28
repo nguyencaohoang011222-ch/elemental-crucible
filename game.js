@@ -70,6 +70,8 @@ function segDist(x, y, w) {
 export const PER_PLAYER = ['inQ', 'dashQ', 'spaceQ', 'aim', 'rewards', 'shopBuys', 'visitBuys', 'visitRelics', 'relicRerolls', 'relicOffer', 'inForge', 'forgeVisits', 'forgeDry', 'upgrades', 'upgradeLog', 'casts', 'merges', 'discovered', 'statDrops', 'rerolls', 'paidRerolls', 'revived', 'skillCache', 'zoneDr', 'pv', 'hidePt', 'goldEarned', 'noHitBoss'];
 // vật thể do người chơi tạo ra: mỗi món nhớ chủ để khi cập nhật thì g.p = chủ của nó
 const OWNED = ['shots', 'zones', 'pending', 'traps', 'walls', 'ults', 'relicFx'];
+// Brutal: quái trâu và đông hơn, ra đòn dồn dập hơn, bắn gấp đôi đạn; boss không bị choáng và đánh liên tục
+export const BRUTAL = { count: 1.35, aggro: 1.4, elite: 0.55, bossWind: 0.78, bossIdle: 0.55, bossSpeed: 1.15, link: 0.25, twinSpread: 0.2 };
 export const COOP = { hp: 0.5, boss: 0.7, count: 0.3, revive: 2, reviveR: 70, reviveHp: 0.4 };   // mỗi người thêm: máu quái +50%, máu boss +70%, số quái +30%
 export const MAP_HP = { forest: 1, dungeon: 1.2, frost: 1.4, volcano: 1.6, palace: 1.8 };   // máu gốc quái thường theo map
 export class Game extends Sim {
@@ -78,7 +80,7 @@ export class Game extends Sim {
     for (const k of PER_PLAYER) Object.defineProperty(this, k, { get() { return this.p['_' + k]; }, set(v) { this.p['_' + k] = v; }, configurable: true });
     this.coopN = opts.coopN || 1; this.players = [this.p];
     const p = this.p;
-    this.training = !!opts.training; this.difficulty = opts.difficulty || 'NORMAL'; this.diff = this.difficulty === 'HARD' ? { hp: 1.3, dmg: 1.3 } : { hp: 1, dmg: 1 };
+    this.training = !!opts.training; this.difficulty = opts.difficulty || 'NORMAL'; this.brutal = this.difficulty === 'HARD'; this.diff = this.brutal ? { hp: 1.4, dmg: 1.3 } : { hp: 1, dmg: 1 }; this.aggro = this.brutal ? BRUTAL.aggro : 1;   // Brutal (khoá cũ 'HARD')
     p.cores = Array(INV_SIZE).fill(null);
     if (this.training) {
       EL.forEach((el, i) => { p.cores[i] = { type: 'el', el }; p.cores[BAR_SIZE + i] = { type: 'el', el }; });
@@ -720,6 +722,7 @@ export class Game extends Sim {
     for (let i = foesBefore; i < this.foes.length; i++) { const f = this.foes[i]; for (const [e, s] of frozen) if ((s.hard || s.blind) && dist(f.x, f.y, e.x, e.y) < 30) f.life = 0; }
     this.byTarget(dt, () => withPhantom(this, this.hidePt, () => enemiesExtra(this, dt)));
     if (this.forge) { const F = this.forge; for (const e of this.enemies) { if (e.dead || e.type === 'DUMMY') continue; const d = dist(e.x, e.y, F.x, F.y), m = FORGE_R + e.r + 6; if (d < m && d > 0.1) { e.x = F.x + (e.x - F.x) / d * m; e.y = F.y + (e.y - F.y) / d * m; if (e.state === 'charge') { e.state = 'stagger'; e.st = 0.5; } } } }
+    if (this.brutal) { const L = this.foes.length; for (let i = foesBefore; i < L; i++) { const f = this.foes[i]; if (!f || f.boss || f.twin || !(f.vx || f.vy)) continue; f.twin = true; const s = (i % 2 ? 1 : -1) * BRUTAL.twinSpread, c = Math.cos(s), n = Math.sin(s); this.foes.push({ ...f, vx: f.vx * c - f.vy * n, vy: f.vx * n + f.vy * c, hit: f.hit ? new Set() : f.hit }); } }
     for (const e of this.enemies) if (e.fMark > 0) e.fMark -= dt;
     this.enemies.push(...confused.filter(c => !c.dead), ...dummies.filter(d => !d.dead), ...bosses.filter(b => !b.dead));
     if (confused.length) { confusedStep(this, dt, e => ENEMIES[e.type] || {}); this.enemies = this.enemies.filter(e => !e.dead); }
@@ -751,14 +754,14 @@ export class Game extends Sim {
       this.emit('bossIntro', { name: BOSS_DEFS[bi].name, epithet: BOSS_DEFS[bi].epithet, idx: bi });
     } else {
       if (this.arena) teardownArena(this, true); this.boss = null;
-      const total = Math.round((5 + n * 1.2) * (1 + COOP.count * (this.coopN - 1))), list = [];   // ít quái hơn nhưng trâu hơn
+      const total = Math.round((5 + n * 1.2) * (1 + COOP.count * (this.coopN - 1)) * (this.brutal ? BRUTAL.count : 1)), list = [];   // ít quái hơn nhưng trâu hơn
       for (let i = 0; i < total; i++) {
         const r = this.rand(), wc = n >= 2 ? 0.25 + n * 0.015 : 0, ws = n >= 3 ? 0.22 + n * 0.012 : 0;
         const ty = rosterType(this, r < ws ? 'SHOOTER' : r < ws + wc ? 'CHARGER' : 'GRUNT'); list.push(ty);
         if (ENEMIES[ty].pack && i < total - 1) { list.push(ty); i++; } // bầy (Cinder Imp) ra theo cặp
       }
       this.sinceElite = (this.sinceElite || 0) + 1;
-      if (n >= 2 && (this.rand() < 0.35 || this.sinceElite >= 3)) { list.splice(Math.floor(list.length * 0.55), 0, eliteFor(this.theme)); this.sinceElite = 0; }
+      if (n >= 2 && (this.rand() < (this.brutal ? BRUTAL.elite : 0.35) || this.sinceElite >= (this.brutal ? 2 : 3))) { list.splice(Math.floor(list.length * 0.55), 0, eliteFor(this.theme)); this.sinceElite = 0; }
       this.spawnQ = list; this.stageTotal = total; this.waveOf = Math.ceil(list.length / Math.ceil(total / 3));
       if (!this.training && rollForge(this, n, false)) { placeForge(this, FORGE_R); this.emit('forgeNear', { name: smithOf(this.theme).name, theme: this.theme }); }
     }

@@ -13,7 +13,7 @@ ok(g.stage === 5 && saved && saved.stage === 5, 'snapshot taken right before sta
 ok(validRun(saved), 'snapshot is a valid run');
 const r = restoreRun(saved, { skin: '' });
 ok(r.stage === 5 && !!r.boss, 'restored game starts at stage 5 (boss)');
-ok(r.p.cls === 'KNIGHT' && r.difficulty === 'HARD' && r.diff.hp === 1.3, 'class + difficulty kept');
+ok(r.p.cls === 'KNIGHT' && r.difficulty === 'HARD' && r.diff.hp === 1.4 && r.brutal, 'class + difficulty kept');
 ok(r.p.cores[0].el === 'WATER' && r.p.cores[1].el === 'FIRE' && r.p.owned.has('FIRE'), 'cores + owned elements kept');
 ok(r.p.gold === 321 && r.p.relics.has('blood') && r.p.forged.has('FIRE') && r.discovered.has('x'), 'gold, relics, forged, discovered kept');
 ok(r.upgrades.power === 2 && Math.abs(r.p.mods.dmg - 1.2544) < 1e-9 && r.p.mods.elDmg.FIRE === 1.2 && r.upgradeLog.includes('Arcane Power'), 'upgrades + mods kept');

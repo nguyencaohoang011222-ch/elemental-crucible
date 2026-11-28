@@ -73,6 +73,19 @@ run(g, 1.3, { fireHeld: true }); ok(!A2.stop && g.p.x - px > 250 && f1.hp <= 100
 ok(g.t > t0, 'the clock runs again');
 const pl = A2.planes.length; run(g, 0.5, { fireHeld: true }); release(g); ok(g.p.charge === 0 && !A2.rush, 'must let go before charging again');
 
+// ---------- bộ chiêu nguyên tố riêng ----------
+{ const { KITS, skillDef, triDef, TRI_SETS } = await import('../kits.js'); const { ULT_IDS } = await import('../ults.js');
+  ok(KITS.AXIOM !== KITS.KNIGHT && Object.keys(KITS.AXIOM).filter(k => k.includes('>')).length === 16, 'Axiom has its own 16 element skills');
+  ok(TRI_SETS.every(set => { const d = triDef('AXIOM', set); return d && ULT_IDS.includes(d.ult) && d.ult.startsWith('ax'); }), 'Axiom has its own 4 three-element ultimates');
+  const q = new Game(12, 'AXIOM', { training: true, lab: true }); q.enemies = []; q.labEnergy = true;
+  for (const [x, y] of [[160, 0], [220, 40], [200, -60]]) { const e = q.spawnAt('GRUNT', q.p.x + x, q.p.y + y); e.spawn = 0; e.hp = e.max = 5000; }
+  q.labFreezeAI = true; let hurt = true;
+  const cores = []; for (const a of ['FIRE', 'WATER', 'EARTH', 'WIND']) for (const b of ['FIRE', 'WATER', 'EARTH', 'WIND']) cores.push(a === b ? { type: 'el', el: a } : { type: 'duo', els: [a, b] });
+  for (const set of TRI_SETS) cores.push({ type: 'tri', els: set.slice() });
+  for (const c of cores) { const sk = q.coreSkill(c), hp0 = q.enemies.reduce((s, e) => s + e.hp, 0); q.p.x = 0; q.p.y = 0; q.p.gcd = 0; q.p.energy = q.p.energyMax; q.castNow(sk, 200, 0); for (let i = 0; i < 200; i++) q.step(1 / 60, { ax: 200, ay: 0 }); for (const e of q.enemies) { e.x = 160 + (e.id % 3) * 30; e.y = (e.id % 3 - 1) * 40; }
+    const dealt = hp0 - q.enemies.reduce((s, e) => s + e.hp, 0); if (!(dealt > 0)) { hurt = false; console.log('  no damage from', sk.name); } }
+  ok(hurt, 'every Axiom element skill and ultimate deals damage'); }
+
 // một stage thật: không lỗi khi chạy
 const s = new Game(99, 'AXIOM', { element: 'FIRE' }); for (let i = 0; i < 900; i++) { s.p.hp = s.p.max; const f = s.enemies[0]; s.step(1 / 60, { ax: f ? f.x : 1, ay: f ? f.y : 0, fireHeld: i % 80 < 62, dash: i % 97 === 0, space: i % 130 === 0, spaceHeld: i % 260 < 40, slots: i % 150 === 0 ? [0] : [] }); s.events.length = 0; }
 ok(s.stage === 1, 'a real stage runs');

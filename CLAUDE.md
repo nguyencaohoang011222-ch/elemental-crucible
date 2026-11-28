@@ -51,8 +51,8 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 ## Axiom (experimental hero, Test Lab only)
 
 - `CLASSES.AXIOM.lab` hides it from New Run. Combat logic is in `axiom.js`, sprite and poses in `gfx/axiomrig.js`, effects in `gfx/axiomfx.js`; test `tests/axiom.mjs`.
-- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes, Rapid Slash (late full release rushes with two spin cuts), Flash Cut (hold a full charge 1 s: `axiomStop` freezes the world and clock, desaturated screen, walk, slash, sheath, then damage), Illusion bar with hold-to-swap, double swap, confusion (`confusedStep` replaces enemy AI) and the Mirror Break death cheat with a screen shatter (one snapshot per use). Element skills temporarily reuse the Knight kit.
-- Not done yet: style rank, the two cube ultimates, own 16 skills, portrait / diorama / skins, run save of `p.ax`.
+- Done: 3-hit chain, timed release leaves a delayed cut (max 4), Shift / cube button folds them, mirror dodge, orbiting cubes, Rapid Slash (late full release rushes with two spin cuts), Flash Cut (hold a full charge 1 s: `axiomStop` freezes the world and clock, desaturated screen, walk, slash, sheath, then damage), Illusion bar with hold-to-swap, double swap, confusion (`confusedStep` replaces enemy AI) and the Mirror Break death cheat with a screen shatter (one snapshot per use). Own element kit in `kits.js` (`KITS.AXIOM`: Fire = falling cube, Water = glass pane beam, Earth = pillar line, Wind = space fold blink) and 4 cube ultimates in `ults.js` (`axcoffin`, `axprism`, `axrain`, `axfold`). Axiom skills have no forge upgrades yet.
+- Not done yet: style rank, the two cube ultimates, forge upgrades, portrait / diorama / skins, run save of `p.ax`.
 
 ## Co-op (2 players, lockstep)
 
@@ -60,3 +60,13 @@ Static browser game (HTML + ES modules, no build step). Run `node tests/<name>.m
 - `Game.coop(seed, cfgs)` builds one game with `players[]`; `stepCoop(dt, [in0, in1])` replaces `step`. The sim must stay **deterministic**: no `Math.random`, `Date.now` or DOM reads in sim code, and anything the UI changes in a run must go through `act(name, args)` in `main.js` (the `ACT` table), never a direct call, or the two machines drift apart.
 - `g.p` is "the player acting right now". Per-player fields listed in `PER_PLAYER` (`game.js`) live on `p` and are read through `g.<name>`. Things a player creates (`OWNED`: shots, zones, pending, traps, walls, ults, relicFx) remember their owner and run with `g.p` set to it (`ownRun`). Enemies chase the nearest player (`pickTarget`, `byTarget`); hazards and enemy shots hit everyone via `g.forTargets`.
 - Scaling per extra player (`COOP`): enemy HP +50%, boss HP +70%, enemy count +30%. A player at 0 HP goes down; standing next to them for 2 s revives at 40% HP; stage clear revives everyone; the run ends when all are down. No gem revive, no run save, no leaderboard submit in co-op.
+
+## Brutal difficulty
+
+- Stored as `difficulty: 'HARD'` (saves and leaderboard keep the old key); the UI says Brutal. `g.brutal` and `BRUTAL` in `game.js`: enemy HP x1.4, damage x1.3, 35% more enemies, more elites, enemy timers run 1.4x faster (`aggro` in `Sim.updateEnemies`), every minion bullet gets a twin. Bosses ignore poise and stagger, attack sooner (shorter wind-up and idle), move faster and chain moves more often.
+
+## Tuning loop (balance)
+
+- `tools/tune/`: `bot.mjs` (shared bot, also used by `tests/run.mjs`; levels `base` / `novice` / `good`, `immortal` mode for boss kill times), `bench.mjs` (every skill vs a fixed single target and a 6-enemy cluster, value = damage per energy compared to the same-tier median of all heroes), `sweep.mjs` (parallel bot runs), `check.mjs` (scores everything against `tuning/targets.json`, prints one SCORE, writes `tuning/report.json`).
+- `/tune` (`.claude/skills/tune/SKILL.md`) runs one round: measure, change one knob group by at most 15%, keep only if the score drops and all tests pass, log it in `tuning/log.md`, commit on the local `tune` branch. `/loop /tune` repeats it. The loop never pushes and never edits targets, the tools or the tests.
+- Bots are a proxy: read results relatively. Traps and skills that need moving enemies show as "not measurable" in the bench.

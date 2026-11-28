@@ -1,6 +1,10 @@
 // 12 icon tuyệt kỹ (16×16, vẽ trên khung vàng của icons.js). p = bảng màu 4 bậc của chiêu: [tối, giữa, sáng, rất sáng].
 const W = '#ffffff', K = '#0c0a12';
 export const ULT_GLYPH = {
+  axcoffin(g, p) { g.rect(3, 3, 10, 10, p[1]); g.rect(4, 4, 8, 8, p[0]); g.rect(6, 6, 4, 4, p[2]); g.rect(7, 7, 2, 2, p[3]); for (const [x, y] of [[2, 2], [12, 2], [2, 12], [12, 12]]) g.rect(x, y, 2, 2, p[3]); },
+  axprism(g, p) { for (let i = 0; i < 6; i++) { g.set(8 + i, 8 - i, p[3]); g.set(8 - i, 8 + i, p[3]); g.set(8 - i, 8 - i, p[2]); g.set(8 + i, 8 + i, p[2]); } g.rect(7, 7, 2, 2, p[3]); },
+  axrain(g, p) { for (const [x, y, w] of [[2, 2, 3], [9, 1, 3], [5, 6, 3], [11, 6, 2], [2, 9, 2], [7, 10, 5]]) { g.rect(x, y, w, w, p[1]); g.rect(x, y, w, 1, p[3]); } },
+  axfold(g, p) { g.rect(2, 2, 12, 1, p[2]); g.rect(2, 13, 12, 1, p[2]); g.rect(2, 2, 1, 12, p[2]); g.rect(13, 2, 1, 12, p[2]); for (let i = 3; i < 8; i++) { g.set(i, i, p[3]); g.set(15 - i, i, p[3]); g.set(i, 15 - i, p[3]); g.set(15 - i, 15 - i, p[3]); } g.rect(7, 7, 2, 2, p[3]); },
   meteorblade(g, p) { // kiếm lửa chém xuống + 3 vệt cong
     g.line(4, 12, 11, 3, K, 2); g.line(4, 12, 11, 3, p[2]); g.line(5, 12, 12, 4, p[3]); g.rect(3, 11, 3, 3, '#7a5a2a'); g.rect(2, 10, 2, 1, '#d4af37');
     for (let i = 0; i < 3; i++) { g.set(9 + i, 9 + i * 1.5, p[1]); g.set(10 + i, 9 + i * 1.5, p[2]); } g.set(12, 2, W); g.set(13, 3, p[3]);

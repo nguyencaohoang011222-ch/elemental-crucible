@@ -118,7 +118,7 @@ function continueRun() {
 function renderContinue() {
   const s = savedRun(), b = $('contbtn'), nb = document.querySelector('.tbtn[data-act="newrun"]'); if (!b) return;
   b.classList.toggle('hidden', !s); if (nb) nb.classList.toggle('hero', !s);
-  if (s) b.querySelector('small').textContent = 'Stage ' + s.stage + ' · ' + CLASSES[s.cls].name + (s.difficulty === 'HARD' ? ' · Hard' : '');
+  if (s) b.querySelector('small').textContent = 'Stage ' + s.stage + ' · ' + CLASSES[s.cls].name + (s.difficulty === 'HARD' ? ' · Brutal' : '');
 }
 function startTraining(cls) {
   ensureAudio(); isTraining = true;
@@ -1051,7 +1051,7 @@ function showVictory() {
   ui = 'end'; const g = game; $('victory').classList.toggle('coop', !!g.coop); if (SFX.victory) SFX.victory(); else if (SFX.bossDown) SFX.bossDown(); if (!isTraining) PR.clearRun();
   if (!isTraining && !g.gemsPaid) g.gemsPaid = runEndedOnline(g.stage, true, g.p.cls, g.difficulty);
   const R0 = g.gemsPaid || { gems: 0, bonus: [], unlocks: [], ach: [] }, cls = g.p.cls, tm = Math.floor(g.t);
-  $('vsub').innerHTML = '<b>' + CLASSES[cls].name + '</b> broke all five titans' + (g.difficulty === 'HARD' ? '<span class="hard">HARD</span>' : '');
+  $('vsub').innerHTML = '<b>' + CLASSES[cls].name + '</b> broke all five titans' + (g.difficulty === 'HARD' ? '<span class="hard">BRUTAL</span>' : '');
   const S = [[tm, v => Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0'), 'clear time'], [g.kills, v => v, 'kills'], [g.stats.dmg, v => v >= 1000 ? Math.round(v / 1000) + 'k' : v, 'damage'], [g.discovered.size, v => v, 'skills used']];
   $('vstats').innerHTML = S.map(s => '<div><b>0</b><span>' + s[2] + '</span></div>').join(''); [...$('vstats').children].forEach((c, i) => countUp(c.querySelector('b'), S[i][0], S[i][1], 900));
   const cards = ['<div class="vcard rare"><div class="vk">Gems earned</div><div class="vg">' + GEM(26) + '<span class="vgn">0</span></div><div class="vd">' + (R0.bonus.length ? R0.bonus.map(b => b[0] + ' +' + b[1]).join('<br>') : 'Victory bonus') + '</div></div>'];
@@ -1069,7 +1069,7 @@ function showEnd() {
   if (game.won) return showVictory();
   ui = 'end'; const g = game, won = g.won; if (!won && SFX.dead) SFX.dead(); $('end').classList.toggle('coop', !!g.coop); if (!isTraining) PR.clearRun();
   $('endt').textContent = won ? 'The Titans Have Fallen' : 'You Have Fallen'; $('endt').style.color = won ? 'var(--gold)' : 'var(--bad)';
-  $('ends').textContent = won ? `${CLASSES[g.p.cls].name} conquered all ${LAST_STAGE} stages${g.difficulty === 'HARD' ? ' on Hard' : ''}.` : `${CLASSES[g.p.cls].name} fell on stage ${g.stage}${g.boss ? ' to ' + g.boss.def.name : ''}.`;
+  $('ends').textContent = won ? `${CLASSES[g.p.cls].name} conquered all ${LAST_STAGE} stages${g.difficulty === 'HARD' ? ' on Brutal' : ''}.` : `${CLASSES[g.p.cls].name} fell on stage ${g.stage}${g.boss ? ' to ' + g.boss.def.name : ''}.`;
   const m = Math.floor(g.t / 60), s = Math.floor(g.t % 60);
   const tm = Math.floor(g.t), S = [['stage', g.stage, v => v, 'stage'], ['titan', g.stats.bossKills, v => v, 'titans felled'], ['kills', g.kills, v => v, 'kills'], ['dmg', g.stats.dmg, v => v >= 1000 ? Math.round(v / 1000) + 'k' : v, 'damage dealt'], ['skills', g.discovered.size, v => v, 'skills used'], ['time', tm, v => Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0'), 'survival time']];
   $('endstats').innerHTML = S.map(([k, , , l]) => '<div class="estat">' + eicon(k) + '<div><b>0</b><span>' + l + '</span></div></div>').join('');

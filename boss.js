@@ -391,7 +391,7 @@ function chooseMove(g, b, P, d) {
 }
 
 export function staggerBoss(g, b, t, why) {
-  if (b.dead) return;
+  if (b.dead || g.brutal) return;   // Brutal: boss không bao giờ bị choáng
   b.stagger = t; b.poise = b.poiseMax; b.poiseImm = t + 5; b.dashing = null; b.sched = []; b.busy = 0; b.tele = null; b.alpha = 1;
   if (b.leap) { b.leap = null; b.z = 0; }
   g.hazards = g.hazards.filter(h => h.owner !== b || h.done);
@@ -399,6 +399,7 @@ export function staggerBoss(g, b, t, why) {
   g.emit('bossStagger', { x: b.x, y: b.y, why });
 }
 export function poiseDamage(g, b, amt) {
+  if (g.brutal) return;
   if (b.stagger > 0 || b.invuln > 0 || b.spawn > 0 || b.poiseImm > 0) return;
   b.poise -= amt; b.poiseIdle = 0;
   if (b.poise <= 0) staggerBoss(g, b, 2.6, 'break');
@@ -434,7 +435,7 @@ export function bossUpdate(g, b, dt) {
     if (b.type === 'BEHEMOTH' && b.phase === 1) { b.shrooms = 5; at(b, 1.0, () => { b.busy = MOVES.brood(g, b, 1); }); }
     if (b.type === 'DRAGON' && b.phase === 2) b.forceMove = 'lastflame';
   }
-  const hid = !!g._real, P = ph[b.phase], w = (P.wind || 1) * (hid ? 1.4 : 1), spd = P.speed || 1;
+  const hid = !!g._real, P = ph[b.phase], w = (P.wind || 1) * (hid ? 1.4 : 1) * (g.brutal ? 0.78 : 1), spd = (P.speed || 1) * (g.brutal ? 1.15 : 1);
   if (b.stagger > 0) { b.stagger -= dt; return; }
   // lịch đòn
   for (const s of b.sched) { s.t -= dt; if (s.t <= 0) { s.done = true; s.fn(); } }
@@ -524,7 +525,7 @@ export function bossUpdate(g, b, dt) {
   if (b.busy > 0) { b.busy -= dt; return; }
   // tiến lại + chọn đòn
   const d = dist(b.x, b.y, p.x, p.y), toP = aimAt(b, p); b.face = toP;
-  const sp = b.def.speed * spd * (1 - (b.slowAmt || 0) * 0.3);
+  const sp = b.def.speed * spd * (1 - (g.brutal ? 0 : b.slowAmt || 0) * 0.3);
   if (d > b.def.range) { b.x += Math.cos(toP) * sp * dt; b.y += Math.sin(toP) * sp * dt; }
   else if (b.def.range > 250 && d < 200) { b.x -= Math.cos(toP) * sp * dt; b.y -= Math.sin(toP) * sp * dt; }
   g.world.collide(b, b.r * 0.8);
@@ -533,9 +534,9 @@ export function bossUpdate(g, b, dt) {
   if (b.idle <= 0) {
     const mv = chooseMove(g, b, P, d); b.last = mv; if (MOVE_CD[mv]) { b.cd = b.cd || {}; b.cd[mv] = g.t + MOVE_CD[mv]; }
     b.busy = MOVES[mv](g, b, w);
-    b.idle = (0.35 + g.rand() * 0.5) * w * (hid ? 1.6 : 1);
+    b.idle = (0.35 + g.rand() * 0.5) * w * (hid ? 1.6 : 1) * (g.brutal ? 0.55 : 1);
     const L = (LINKS[b.type] || {})[mv];
-    if (L && !hid && !b.linked && g.rand() < L[1]) { const nx = typeof L[0] === 'function' ? L[0](b) : L[0]; if (MOVES[nx]) { b.forceMove = nx; b.idle = 0.05; b.linked = true; g.emit('bossLink', { x: b.x, y: b.y }); } }
+    if (L && !hid && !b.linked && g.rand() < L[1] + (g.brutal ? 0.25 : 0)) { const nx = typeof L[0] === 'function' ? L[0](b) : L[0]; if (MOVES[nx]) { b.forceMove = nx; b.idle = 0.05; b.linked = true; g.emit('bossLink', { x: b.x, y: b.y }); } }
     else b.linked = false;
   }
 }

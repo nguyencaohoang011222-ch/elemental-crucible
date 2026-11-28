@@ -104,7 +104,7 @@ export const TRI_UP = {
 
 // ---------- API ----------
 const twistKey = d => d && d.key && !d.ult ? d.key : null;
-FORM_OF.AXIOM = FORM_OF.KNIGHT;
+FORM_OF.AXIOM = { FIRE: 'cube', WATER: 'pane', EARTH: 'pillar', WIND: 'fold' };
 export function hasForgeUp(d) { if (!d) return false; if (d.ult) return !!TRI_UP[d.ult]; return !!T[d.key]; }
 export function forgeInfo(cls, d) {
   if (!d) return null;

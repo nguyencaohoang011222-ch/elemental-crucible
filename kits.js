@@ -171,8 +171,39 @@ const ULTS = {
   }
 };
 export const ULT_TABLE = ULTS;
-// Axiom đang thử: tạm dùng bộ chiêu nguyên tố của Knight cho tới khi có 16 chiêu hình khối riêng
-KITS.AXIOM = KITS.KNIGHT; ULT.AXIOM = ULT.KNIGHT; ULTS.AXIOM = ULTS.KNIGHT;
+// ---------- Axiom, Chủ Khối: nguyên tố đầu là hình khối, nguyên tố sau là hiệu ứng ----------
+// Lửa = Khối rơi (nổ tại con trỏ) · Nước = Tấm kính (tia thẳng) · Đất = Cột khối (hàng cột trồi lên) · Gió = Gập không gian (dịch chuyển)
+KITS.AXIOM = {
+  forms: { FIRE: 'Cube', WATER: 'Pane', EARTH: 'Pillar', WIND: 'Fold' },
+  'FIRE>FIRE':   S('Furnace Cube', 'DAMAGE', 5, 'ground', { range: 380, radius: 105, delay: 0.45, dmg: 74, burn: 3 }, ['area'], 'A burning cube slams down at the cursor and bursts.'),
+  'FIRE>WATER':  S('Steam Cube', 'CONTROL', 6, 'ground', { range: 380, radius: 118, delay: 0.4, dmg: 36, blind: 1.2, wet: 2, leave: { kind: 'steam', radius: 118, life: 3.5 } }, ['area', 'zone'], 'A cube of boiling water shatters into blinding steam.'),
+  'FIRE>EARTH':  S('Magma Cube', 'AREA', 7, 'ground', { range: 360, radius: 96, delay: 0.5, dmg: 62, stun: 0.8, leave: { kind: 'lava', radius: 90, life: 3.5 } }, ['area', 'zone'], 'A molten cube crashes down, stunning and leaving lava.'),
+  'FIRE>WIND':   S('Scatter Cubes', 'DAMAGE', 6, 'rain', { range: 400, count: 6, duration: 0.45, area: 95, radius: 52, delay: 0.3, dmg: 26, burn: 2 }, ['area'], 'Six small cubes rain down and blow up one after another.'),
+  'WATER>WATER': S('Glass Lance', 'CONTROL', 4, 'beam', { length: 520, width: 44, dmg: 52, freeze: 1.2 }, ['beam'], 'A pane of frozen glass slices straight ahead and freezes.'),
+  'WATER>FIRE':  S('Searing Pane', 'DAMAGE', 5, 'beam', { length: 480, width: 56, dmg: 60, burn: 2.5 }, ['beam'], 'A red-hot pane cuts through the whole line.'),
+  'WATER>EARTH': S('Prism Wall', 'AREA', 6, 'beam', { length: 420, width: 60, dmg: 36, stun: 0.5, endBurst: { radius: 110, dmg: 40, stun: 0.6 } }, ['beam', 'area'], 'A heavy prism slides out and shatters at the end, stunning.'),
+  'WATER>WIND':  S('Shear Pane', 'CONTROL', 6, 'beam', { length: 560, width: 70, dmg: 30, push: 380, wet: 2 }, ['beam'], 'A wide pane of wind-glass shoves the whole line away.'),
+  'EARTH>EARTH': S('Pillar Line', 'CONTROL', 5, 'spikes', { count: 6, spacing: 56, radius: 46, step: 0.05, dmg: 48, stun: 0.7 }, ['area'], 'Square pillars punch up in a line toward the cursor.'),
+  'EARTH>FIRE':  S('Ember Pillars', 'AREA', 7, 'spikes', { count: 7, spacing: 52, radius: 42, step: 0.05, dmg: 34, burn: 2.5, leaveEach: { kind: 'fire', radius: 30, life: 2.2 } }, ['area', 'zone'], 'Glowing pillars rise and leave the ground burning.'),
+  'EARTH>WATER': S('Frost Pillars', 'CONTROL', 6, 'spikes', { count: 6, spacing: 55, radius: 46, step: 0.05, dmg: 28, freeze: 1.0, slow: [0.5, 1.5] }, ['area'], 'Ice pillars burst up in a line and freeze what they hit.'),
+  'EARTH>WIND':  S('Pillar Fan', 'AREA', 7, 'spikes', { count: 5, spacing: 55, radius: 40, step: 0.05, lines: 3, spread: 0.45, dmg: 30, push: 260 }, ['area'], 'Three lines of pillars fan out and knock foes back.'),
+  'WIND>WIND':   S('Fold Step', 'MOBILITY', 4, 'blink', { range: 230, nova: { radius: 120, dmg: 38, push: 340 } }, ['mobility', 'area'], 'Fold space to the cursor and blast foes away where you land.'),
+  'WIND>FIRE':   S('Fold Flare', 'MOBILITY', 5, 'blink', { range: 230, novaOrigin: { radius: 110, dmg: 36, burn: 2.5 }, nova: { radius: 110, dmg: 36, burn: 2.5 } }, ['mobility', 'area'], 'Fold away; both ends of the fold burst into flame.'),
+  'WIND>WATER':  S('Fold Mirror', 'MOBILITY', 5, 'blink', { range: 230, nova: { radius: 130, dmg: 26, freeze: 0.9, wet: 2 } }, ['mobility', 'area'], 'Fold to the cursor; the space you land in freezes.'),
+  'WIND>EARTH':  S('Fold Crush', 'MOBILITY', 7, 'blink', { range: 200, nova: { radius: 140, dmg: 56, stun: 1.0 } }, ['mobility', 'area'], 'Fold in and drop the weight of the space you left onto foes, stunning.')
+};
+ULT.AXIOM = {
+  FIRE:  S('Cube Collapse', 'ULTIMATE', 20, 'ground', { range: 380, radius: 220, delay: 0.6, dmg: 110, burn: 3 }, ['area'], 'A giant cube falls on the cursor and collapses.'),
+  WATER: S('Prism Burst', 'ULTIMATE', 20, 'nova', { radius: 240, delay: 0.35, dmg: 70, freeze: 1.2 }, ['area'], 'A prism forms around you and shatters, freezing everything near.'),
+  EARTH: S('Monolith Ring', 'ULTIMATE', 20, 'spikes', { count: 6, spacing: 58, radius: 46, step: 0.05, radial: 8, dmg: 50, stun: 0.9 }, ['area'], 'Eight lines of pillars burst out in a star.'),
+  WIND:  S('Fold Cascade', 'ULTIMATE', 20, 'blink', { range: 300, novaOrigin: { radius: 150, dmg: 60, push: 300 }, nova: { radius: 170, dmg: 70, stun: 0.8 } }, ['mobility', 'area'], 'Fold across the field; both ends explode.')
+};
+ULTS.AXIOM = {
+  FIRE: X('Cube Coffin', 'axcoffin', 70, 'void', ['area'], 'A huge cube closes around the cursor. Its walls slam in again and again, then it collapses.', { wall: { dmg: 22, push: -120 }, crush: { dmg: 120, stun: 1.0 } }),
+  WATER: X('Prism Lattice', 'axprism', 68, 'frost', ['beam', 'area'], 'Four glass panes spin around you for 3s, slicing and chilling everything they cross.', { beam: { dmg: 16, slow: [0.4, 0.6] } }),
+  EARTH: X('Cube Rain', 'axrain', 72, 'storm', ['area'], 'A storm of cubes rains on the area, faster and faster, then one last silent beat and a giant cube.', { cube: { dmg: 30, burn: 1 }, final: { dmg: 110, stun: 0.8 } }),
+  WIND: X('Grand Fold', 'axfold', 70, 'gale', ['mobility', 'area'], 'Fold every foe near the cursor into one point, crush the fold shut, then step out of it.', { fold: { dmg: 95, stun: 1.2 } })
+};
 // 12 chiêu ghép 3 trong cả game: mỗi lớp 4 bộ = C(4,3). Thứ tự ghép không quan trọng; bộ nhận diện bằng nguyên tố bị thiếu.
 // MISS_TO_ULT[lớp][nguyên tố thiếu] = khoá trong ULTS (giữ nguyên cơ chế/icon/VFX cũ).
 const MISS_TO_ULT = {
@@ -180,7 +211,7 @@ const MISS_TO_ULT = {
   RANGER: { WATER: 'FIRE', EARTH: 'WIND', WIND: 'EARTH', FIRE: 'WATER' },
   MAGE:   { WATER: 'EARTH', EARTH: 'WIND', WIND: 'FIRE', FIRE: 'WATER' }
 };
-MISS_TO_ULT.AXIOM = MISS_TO_ULT.KNIGHT;
+MISS_TO_ULT.AXIOM = { WATER: 'FIRE', EARTH: 'WATER', WIND: 'EARTH', FIRE: 'WIND' };
 export const triSort = els => EL.filter(e => els.includes(e));
 export const triMissing = els => EL.find(e => !els.includes(e));
 export const TRI_SETS = EL.map(m => EL.filter(e => e !== m)); // 4 bộ, đã sắp

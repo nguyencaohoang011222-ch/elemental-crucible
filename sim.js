@@ -338,10 +338,10 @@ export class Sim {
     const p = this.p;
     for (const e of this.enemies) {
       const d = ENEMIES[e.type];
-      e.flash = Math.max(0, e.flash - dt); e.atkCd = Math.max(0, e.atkCd - dt); e.spawn = Math.max(0, e.spawn - dt);
+      e.flash = Math.max(0, e.flash - dt); e.atkCd = Math.max(0, e.atkCd - dt * (this.aggro || 1)); e.spawn = Math.max(0, e.spawn - dt);
       e.x += e.kx * dt; e.y += e.ky * dt; const kd = Math.exp(-9 * dt); e.kx *= kd; e.ky *= kd;
       const dp = dist(e.x, e.y, p.x, p.y), toP = Math.atan2(p.y - e.y, p.x - e.x);
-      e.st -= dt;
+      e.st -= dt * (this.aggro || 1);   // Brutal: hồi chiêu, báo đòn, nghỉ sau húc đều nhanh hơn
       if (e.spawn > 0) { this.world.collide(e, d.r); continue; }
       const ef = this.surfFxE ? this.surfFxE(e.x, e.y) : this.surfFx ? this.surfFx(e.x, e.y) : null, sm = ef ? ef.spd : 1;
       const step = (sp) => { e.x += Math.cos(e.ma ?? toP) * sp * sm * dt; e.y += Math.sin(e.ma ?? toP) * sp * sm * dt; };

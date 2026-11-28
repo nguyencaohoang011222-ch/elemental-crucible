@@ -1,0 +1,54 @@
+{
+  "_note": "Target bands for the balance loop (tools/tune/check.mjs). Only change them after the user agrees. A metric scores 0 inside its band; outside, it scores weight x relative distance to the nearest edge.",
+  "skills": {
+    "_why": "Each attack skill's value (damage per energy, single + cluster/3) compared to the median of the other attack skills of the same tier across all heroes. Utility skills (control, mobility, defense) are not scored.",
+    "ratio": [
+      0.7,
+      1.4
+    ],
+    "weight": 1
+  },
+  "bossTime": {
+    "5": [
+      30,
+      75
+    ],
+    "10": [
+      35,
+      100
+    ],
+    "_why": "Seconds to kill each boss with an immortal good bot on Normal (pure damage check, per hero, averaged over the 4 starting elements).",
+    "weight": 2
+  },
+  "bossTimeSpread": {
+    "_why": "Slowest hero / fastest hero boss kill time (S5 + S10). Keeps the four heroes close in damage.",
+    "max": 1.3,
+    "weight": 3
+  },
+  "progress": {
+    "_why": "Mean progress (stage reached + fraction of boss HP removed) of the good bot on Normal, per hero.",
+    "normalGood": [
+      7,
+      12
+    ],
+    "weight": 2
+  },
+  "progressSpread": {
+    "_why": "Best hero / worst hero progress for the good bot on Normal. Plan: heroes within 15%.",
+    "max": 1.15,
+    "weight": 3
+  },
+  "brutal": {
+    "_why": "Brutal progress / Normal progress for the good bot, all heroes pooled. Brutal should be 25-45% harder.",
+    "ratio": [
+      0.55,
+      0.75
+    ],
+    "weight": 3
+  },
+  "skillGap": {
+    "_why": "Good bot progress / novice bot progress on Normal, all heroes pooled. Easy to play, hard to master: practice must pay off. Off for now (weight 0): the good bot is not reliably better than the novice bot yet, so this measures the bot, not the game.",
+    "min": 1.15,
+    "weight": 0
+  }
+}
