@@ -7,12 +7,12 @@
   ],
   "_heroes": "Heroes the loop balances. AXIOM is left out on purpose (user, 2026-11-28): do not tune it.",
   "skills": {
-    "_why": "Each attack skill's value (damage per energy, single + cluster/3) compared to the median of the other attack skills of the same tier across all heroes. Utility skills (control, mobility, defense) are not scored.",
+    "_why": "Each attack skill's value (damage per energy, single + cluster/3) compared to the median of the other attack skills of the same tier across all heroes. Utility skills (control, mobility, defense) are not scored. Replaced by \"fight\" (weight 0, kept for reference).",
     "ratio": [
       0.7,
       1.4
     ],
-    "weight": 1
+    "weight": 0
   },
   "bossTime": {
     "5": [
@@ -56,5 +56,42 @@
     "_why": "Good bot progress / novice bot progress on Normal, all heroes pooled. Easy to play, hard to master: practice must pay off. Off for now (weight 0): the good bot is not reliably better than the novice bot yet, so this measures the bot, not the game.",
     "min": 1.15,
     "weight": 0
+  },
+  "fight": {
+    "_why": "Fight bench (tools/tune/fightbench.mjs): each skill in an 8s fight with live enemies; value = damage + HP saved + control seconds x 12, per energy, compared to the median of the same tier across Knight, Ranger and Mage.",
+    "ratio": [
+      0.7,
+      1.4
+    ],
+    "weight": 1
+  },
+  "merge": {
+    "_why": "Merging must pay: tier medians of fight value per energy.",
+    "duoOverSingle": 1.15,
+    "triOverDuo": 1.3,
+    "weight": 3
+  },
+  "bossFloor": {
+    "_why": "Bosses 3-5 (stages 15, 20, 25) must survive at least this long even against the fastest strategy (immortal bot with a real build).",
+    "stages": [
+      15,
+      20,
+      25
+    ],
+    "min": 25,
+    "weight": 3
+  },
+  "stagger": {
+    "_why": "Share of the boss fight the boss spends staggered (immortal bot, both strategies).",
+    "max": 0.25,
+    "weight": 3
+  },
+  "strategy": {
+    "_why": "No dominant playstyle: boss kill time of the single-skill spam bot / the merge bot.",
+    "spamOverMerge": [
+      0.8,
+      1.25
+    ],
+    "weight": 3
   }
 }

@@ -12,7 +12,7 @@ Goal: move the balance score (`tools/tune/check.mjs`, lower is better, 0 means e
 - **Never push.** Never `git push`, never merge into `main`. Commit only on the local branch `tune`.
 - **Leave Axiom alone.** Only the heroes in `targets.heroes` (Knight, Ranger, Mage) are tuned; never change Axiom numbers (`KITS.AXIOM`, `ax*` ultimates, `axiom.js`).
 - **Never edit the yardstick.** Do not change `tuning/targets.json`, `tools/tune/*` or the tests to make a number pass. If a target looks wrong, stop and ask the user.
-- **Numbers only.** Change balance values: skill `dmg` / `cost` / `radius` / counts in `kits.js`, ultimate numbers in `ults.js`, `BRUTAL` / `COOP` / enemy and boss stats in `game.js`, `boss.js`, `sim.js` (`CLASSES`, `ENEMIES`), economy in `profile.js` / `forge.js`. If a fix needs new mechanics or behaviour, stop and report it as a design question.
+- **Numbers only.** Change balance values: skill `dmg` / `cd` / `radius` / counts in `kits.js`; ultimate signature numbers in the `X(...)` params in `kits.js` (`exec`, `chain`, `titanShield`, `pullR`, `markAmt`, `shred`, `copy`, `packBonus`, `drown`, `refund`, `wallT`, `stormRefund`…); the rule constants in `game.js` (`CD.scale`, `COST.*`, `RESONANCE.*`, `ULTFX.*`, `BRUTAL`, `COOP`) and `defense.js` (`HEAL.perSec`, `HEAL.burst`); boss stats (`hp`, `poise`) in `boss.js`; `CLASSES` / `ENEMIES` in `sim.js`; economy in `profile.js` / `forge.js`. If a fix needs new mechanics or behaviour, stop and report it as a design question.
 - **One knob group per round, at most ±15% per value.** A knob group is one skill, one boss, one hero's base stats, or one `BRUTAL` entry.
 - Keep the sim deterministic (no `Math.random`, `Date.now`).
 
@@ -44,4 +44,6 @@ The final report lists every kept change (from `tuning/log.md`), the score from 
 
 - The bots are a proxy. The good bot dies around stage 5–9; boss times come from an immortal bot. Read results as relative (hero vs hero, skill vs skill, Normal vs Brutal), not as how a human feels.
 - `node tools/tune/bench.mjs [HERO]` prints every skill's raw numbers; `node tools/tune/sweep.mjs 3 [HERO] [--normal|--brutal]` prints per-hero run results.
-- `tuning/report.json` holds the full last report (all items, groups, skill rows).
+- `tuning/report.json` holds the full last report (all items, groups, skill rows, boss trials).
+- `node tools/tune/fightbench.mjs [HERO]` prints each skill's fight value (damage + HP saved + control); `node tools/tune/bosstrial.mjs [stages] [--spam|--merge] [--relics] [--mortal]` prints boss fights per strategy.
+- Prefer the rule constants for system-wide rows (merge value, boss floor, stagger, strategy) and per-skill numbers for single skill rows.
